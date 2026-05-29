@@ -1,0 +1,12 @@
+.env
+.env.example
+.gitignore
+.DS_Store
+__pycache__/
+*.pyc
+results/*.json
+data/*.csv.zst
+data/lichess_db_puzzle.csv
+README.md
+Dockerfile
+.dockerignore
