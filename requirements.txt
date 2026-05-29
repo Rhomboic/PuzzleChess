@@ -1,0 +1,5 @@
+anthropic
+openai
+boto3
+python-dotenv
+python-chess
