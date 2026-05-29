@@ -6,6 +6,7 @@ Supports Claude (Anthropic) and OpenAI models.
 """
 
 import os
+import time
 import chess
 import anthropic
 from openai import OpenAI
@@ -53,7 +54,8 @@ def build_user_prompt(fen: str, mate_type: str) -> str:
 
 # ── Claude agent ──────────────────────────────────────────────────────────────
 
-def query_claude(client: anthropic.Anthropic, model: str, fen: str, mate_type: str) -> str:
+def query_claude(client: anthropic.Anthropic, model: str, fen: str, mate_type: str) -> dict:
+    start = time.time()
     response = client.messages.create(
         model=model,
         max_tokens=64,
@@ -68,12 +70,19 @@ def query_claude(client: anthropic.Anthropic, model: str, fen: str, mate_type: s
             {"role": "user", "content": build_user_prompt(fen, mate_type)}
         ],
     )
-    return response.content[0].text.strip()
+    latency_ms = int((time.time() - start) * 1000)
+    return {
+        "predicted_moves": response.content[0].text.strip(),
+        "latency_ms":      latency_ms,
+        "input_tokens":    response.usage.input_tokens,
+        "output_tokens":   response.usage.output_tokens,
+    }
 
 
 # ── OpenAI agent ──────────────────────────────────────────────────────────────
 
-def query_openai(client: OpenAI, model: str, fen: str, mate_type: str) -> str:
+def query_openai(client: OpenAI, model: str, fen: str, mate_type: str) -> dict:
+    start = time.time()
     response = client.chat.completions.create(
         model=model,
         max_tokens=64,
@@ -82,7 +91,13 @@ def query_openai(client: OpenAI, model: str, fen: str, mate_type: str) -> str:
             {"role": "user",   "content": build_user_prompt(fen, mate_type)},
         ],
     )
-    return response.choices[0].message.content.strip()
+    latency_ms = int((time.time() - start) * 1000)
+    return {
+        "predicted_moves": response.choices[0].message.content.strip(),
+        "latency_ms":      latency_ms,
+        "input_tokens":    response.usage.prompt_tokens,
+        "output_tokens":   response.usage.completion_tokens,
+    }
 
 
 # ── Main agent loop ───────────────────────────────────────────────────────────
@@ -120,22 +135,25 @@ def run_agent(puzzles: list, model: str) -> list:
 
         try:
             if is_claude:
-                predicted = query_claude(client, model, fen, mate_type)
+                response = query_claude(client, model, fen, mate_type)
             else:
-                predicted = query_openai(client, model, fen, mate_type)
-            print(f"-> {predicted}")
+                response = query_openai(client, model, fen, mate_type)
+            print(f"-> {response['predicted_moves']} ({response['latency_ms']}ms)")
         except Exception as e:
-            predicted = ""
+            response = {"predicted_moves": "", "latency_ms": 0, "input_tokens": 0, "output_tokens": 0}
             print(f"ERROR: {e}")
 
         results.append({
             "PuzzleId":        puzzle_id,
             "model":           model,
-            "predicted_moves": predicted,
+            "predicted_moves": response["predicted_moves"],
             "correct_moves":   solution,
             "mate_type":       mate_type,
             "tier":            puzzle.get("Tier", ""),
             "rating":          puzzle.get("Rating", ""),
+            "latency_ms":      response["latency_ms"],
+            "input_tokens":    response["input_tokens"],
+            "output_tokens":   response["output_tokens"],
         })
 
     return results
