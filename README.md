@@ -46,19 +46,32 @@ PuzzleChess/
 
 ## Eval metrics
 
-Each puzzle is scored on:
-- **Correctness** — exact match of full move sequence (0 or 1)
-- **Move validity** — per-move legality checked via `python-chess`
-- **Output format followed** — did the model return the expected number of UCI moves?
-- **Latency** — wall clock of the API call
+Each puzzle's model output is parsed (UCI tokens are extracted from the response, stripping any stray `+`, `#`, `x`, or reasoning text) and scored on:
 
-**Score formula:**
+**Per-puzzle metrics**
+- **Correctness** (`correct`, 0/1) — does the full predicted move sequence exactly match the puzzle's solution?
+- **Move validity** (`move_validity`, per-move list) — each predicted move is applied to the board with `python-chess`; a move is valid only if it is legal in the resulting position. Stops at the first illegal move.
+- **Valid ratio** (`valid_ratio`) — `valid_moves_count / total_moves`. Partial credit for producing legal moves even when the full line is wrong.
+- **Output format followed** (`output_format_followed`, 0/1) — did the model produce exactly the expected number of **well-formed UCI moves** (source+destination squares, e.g. `e2e4`, plus promotion suffix where needed)? Because non-UCI output (algebraic like `Rxf8#`, prose, wrong move counts) is stripped during parsing, this metric captures both **notation correctness** and **sequence length** — anything that isn't clean UCI fails to reach the expected count.
+- **Latency** (`latency_ms`) — wall-clock time of the API call.
+- **Token usage** (`input_tokens`, `output_tokens`) — reported by each provider's API.
+
+**Composite score**
 ```
 score = 0.45 * correct
       + 0.35 * valid_ratio
-      + 0.10 * (1 - normalized_latency)
+      + 0.10 * (1 - normalized_latency)   # normalized against a 30s cap
       + 0.10 * output_format_followed
 ```
+
+**Aggregate metrics (per model)**
+- `overall_accuracy` — % of puzzles solved exactly
+- `avg_score` — mean composite score
+- `avg_valid_ratio` — mean legal-move ratio
+- `format_compliance_rate` — % of puzzles where output format was followed
+- `avg_latency_ms`, `avg_input_tokens`, `avg_output_tokens`
+- `accuracy_by_tier` — beginner / intermediate / advanced / expert
+- `accuracy_by_mate_type` — mateIn1 … mateIn5
 
 ## Running locally
 

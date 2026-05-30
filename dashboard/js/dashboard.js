@@ -154,8 +154,8 @@ function buildOverview(loadedModels) {
           <h3>Eval Metrics</h3>
           <div class="method-grid">
             <div class="method-item"><span class="method-label">Accuracy</span><span class="method-val">Exact match of full move sequence (binary)</span></div>
-            <div class="method-item"><span class="method-label">Valid Ratio</span><span class="method-val">% of predicted moves that are legal chess moves</span></div>
-            <div class="method-item"><span class="method-label">Format Compliance</span><span class="method-val">Model returned the expected number of UCI moves</span></div>
+            <div class="method-item"><span class="method-label">Valid Ratio</span><span class="method-val">Share of predicted moves that are legal in the position (validated with python-chess)</span></div>
+            <div class="method-item"><span class="method-label">Format Compliance</span><span class="method-val">Output was the right number of well-formed UCI moves — captures both notation (e.g. e2e4, not Rxf8#) and sequence length</span></div>
             <div class="method-item"><span class="method-label">Latency</span><span class="method-val">Wall clock time of the API call</span></div>
           </div>
         </div>
