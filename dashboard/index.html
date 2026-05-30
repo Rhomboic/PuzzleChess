@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PuzzleChess Benchmark</title>
+  <link rel="stylesheet" href="style.css" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+</head>
+<body>
+
+<!-- ── Hero ── -->
+<div class="hero">
+  <div class="container">
+    <div class="hero-inner">
+      <div>
+        <h1>Puzzle<span>Chess</span> Benchmark</h1>
+        <p>Evaluating LLM chess puzzle performance across difficulty tiers and mate types</p>
+      </div>
+      <div class="chips">
+        <span class="chip"><strong>300</strong> puzzles</span>
+        <span class="chip"><strong>6</strong> models</span>
+        <span class="chip"><strong>5</strong> mate types</span>
+        <span class="chip"><strong>4</strong> difficulty tiers</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Tabs ── -->
+<div class="container">
+  <div class="tabs-bar">
+    <button class="tab-btn active" data-tab="overview">Overview</button>
+    <button class="tab-btn" data-tab="gpt-4.1-mini">GPT-4.1 Mini</button>
+    <button class="tab-btn" data-tab="gpt-4.1">GPT-4.1</button>
+    <button class="tab-btn" data-tab="claude-haiku-4-5">Claude Haiku 4.5</button>
+    <button class="tab-btn pending" data-tab="claude-sonnet-4-6">Claude Sonnet 4.6</button>
+    <button class="tab-btn pending" data-tab="claude-opus-4-7">Claude Opus 4.7</button>
+    <button class="tab-btn pending" data-tab="o3">o3</button>
+  </div>
+
+  <!-- ── Overview ── -->
+  <div id="panel-overview" class="tab-panel active">
+
+    <!-- Comparison table -->
+    <div class="section card">
+      <div class="card-title">Model Comparison</div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Model</th>
+              <th>Accuracy</th>
+              <th>Avg Score</th>
+              <th>Valid Ratio</th>
+              <th>Format Compliance</th>
+              <th>Avg Latency</th>
+              <th>Avg Output Tokens</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><span class="model-name">GPT-4.1 Mini</span><span class="badge badge-openai">OpenAI</span></td>
+              <td class="accent">1.7%</td>
+              <td>0.270</td>
+              <td>23.8%</td>
+              <td>84.3%</td>
+              <td>1.4s</td>
+              <td>95</td>
+            </tr>
+            <tr>
+              <td><span class="model-name">GPT-4.1</span><span class="badge badge-openai">OpenAI</span></td>
+              <td class="accent">6.3%</td>
+              <td>0.355</td>
+              <td>40.6%</td>
+              <td>87.0%</td>
+              <td>0.75s</td>
+              <td>25</td>
+            </tr>
+            <tr>
+              <td><span class="model-name">Claude Haiku 4.5</span><span class="badge badge-claude">Claude</span></td>
+              <td class="purple">1.7%</td>
+              <td>0.176</td>
+              <td>14.7%</td>
+              <td>44.7%</td>
+              <td>8.3s</td>
+              <td>899</td>
+            </tr>
+            <tr class="pending-row">
+              <td><span class="model-name">Claude Sonnet 4.6</span><span class="badge badge-pending">Pending</span></td>
+              <td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td>
+            </tr>
+            <tr class="pending-row">
+              <td><span class="model-name">Claude Opus 4.7</span><span class="badge badge-pending">Pending</span></td>
+              <td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td>
+            </tr>
+            <tr class="pending-row">
+              <td><span class="model-name">o3</span><span class="badge badge-pending">Pending</span></td>
+              <td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Charts row 1 -->
+    <div class="grid-2 section">
+      <div class="card">
+        <div class="card-title">Accuracy by Model</div>
+        <div class="chart-wrap"><canvas id="chart-accuracy"></canvas></div>
+      </div>
+      <div class="card">
+        <div class="card-title">Avg Score by Model</div>
+        <div class="chart-wrap"><canvas id="chart-score"></canvas></div>
+      </div>
+    </div>
+
+    <!-- Charts row 2 -->
+    <div class="grid-2 section">
+      <div class="card">
+        <div class="card-title">Latency vs Accuracy</div>
+        <div class="chart-wrap"><canvas id="chart-scatter"></canvas></div>
+      </div>
+      <div class="card">
+        <div class="card-title">Format Compliance Rate</div>
+        <div class="chart-wrap"><canvas id="chart-format"></canvas></div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ── GPT-4.1 Mini ── -->
+  <div id="panel-gpt-4.1-mini" class="tab-panel">
+    <div class="model-header">
+      <h2>GPT-4.1 Mini</h2>
+      <span class="model-badge-lg badge-openai" style="background:rgba(0,212,255,0.15);color:#00d4ff;border-radius:20px;padding:4px 12px;font-size:11px;font-weight:600;text-transform:uppercase">OpenAI · Fast / Cheap</span>
+    </div>
+    <div class="stat-grid">
+      <div class="stat-card"><div class="stat-label">Accuracy</div><div class="stat-value accent">1.7%</div><div class="stat-sub">5 / 300 correct</div></div>
+      <div class="stat-card"><div class="stat-label">Avg Score</div><div class="stat-value muted">0.270</div><div class="stat-sub">weighted composite</div></div>
+      <div class="stat-card"><div class="stat-label">Format Compliance</div><div class="stat-value accent">84.3%</div><div class="stat-sub">followed UCI instructions</div></div>
+      <div class="stat-card"><div class="stat-label">Avg Latency</div><div class="stat-value muted">1.4s</div><div class="stat-sub">per puzzle</div></div>
+    </div>
+    <div class="grid-2 section">
+      <div class="card">
+        <div class="card-title">Accuracy by Difficulty Tier</div>
+        <div class="chart-wrap"><canvas id="chart-gpt-4.1-mini-tier"></canvas></div>
+      </div>
+      <div class="card">
+        <div class="card-title">Accuracy by Mate Type</div>
+        <div class="chart-wrap"><canvas id="chart-gpt-4.1-mini-mate"></canvas></div>
+      </div>
+    </div>
+    <div class="section card">
+      <div class="card-title">Score Distribution (300 puzzles)</div>
+      <div class="chart-wrap"><canvas id="chart-gpt-4.1-mini-dist"></canvas></div>
+    </div>
+  </div>
+
+  <!-- ── GPT-4.1 ── -->
+  <div id="panel-gpt-4.1" class="tab-panel">
+    <div class="model-header">
+      <h2>GPT-4.1</h2>
+      <span class="model-badge-lg" style="background:rgba(0,212,255,0.15);color:#00d4ff;border-radius:20px;padding:4px 12px;font-size:11px;font-weight:600;text-transform:uppercase">OpenAI · Mid</span>
+    </div>
+    <div class="stat-grid">
+      <div class="stat-card"><div class="stat-label">Accuracy</div><div class="stat-value accent">6.3%</div><div class="stat-sub">19 / 300 correct</div></div>
+      <div class="stat-card"><div class="stat-label">Avg Score</div><div class="stat-value muted">0.355</div><div class="stat-sub">weighted composite</div></div>
+      <div class="stat-card"><div class="stat-label">Format Compliance</div><div class="stat-value accent">87.0%</div><div class="stat-sub">followed UCI instructions</div></div>
+      <div class="stat-card"><div class="stat-label">Avg Latency</div><div class="stat-value muted">0.75s</div><div class="stat-sub">per puzzle</div></div>
+    </div>
+    <div class="grid-2 section">
+      <div class="card">
+        <div class="card-title">Accuracy by Difficulty Tier</div>
+        <div class="chart-wrap"><canvas id="chart-gpt-4.1-tier"></canvas></div>
+      </div>
+      <div class="card">
+        <div class="card-title">Accuracy by Mate Type</div>
+        <div class="chart-wrap"><canvas id="chart-gpt-4.1-mate"></canvas></div>
+      </div>
+    </div>
+    <div class="section card">
+      <div class="card-title">Score Distribution (300 puzzles)</div>
+      <div class="chart-wrap"><canvas id="chart-gpt-4.1-dist"></canvas></div>
+    </div>
+  </div>
+
+  <!-- ── Claude Haiku ── -->
+  <div id="panel-claude-haiku-4-5" class="tab-panel">
+    <div class="model-header">
+      <h2>Claude Haiku 4.5</h2>
+      <span class="model-badge-lg" style="background:rgba(124,58,237,0.15);color:#7c3aed;border-radius:20px;padding:4px 12px;font-size:11px;font-weight:600;text-transform:uppercase">Anthropic · Fast / Cheap</span>
+    </div>
+    <div class="stat-grid">
+      <div class="stat-card"><div class="stat-label">Accuracy</div><div class="stat-value purple">1.7%</div><div class="stat-sub">5 / 300 correct</div></div>
+      <div class="stat-card"><div class="stat-label">Avg Score</div><div class="stat-value muted">0.176</div><div class="stat-sub">weighted composite</div></div>
+      <div class="stat-card"><div class="stat-label">Format Compliance</div><div class="stat-value purple">44.7%</div><div class="stat-sub">followed UCI instructions</div></div>
+      <div class="stat-card"><div class="stat-label">Avg Latency</div><div class="stat-value muted">8.3s</div><div class="stat-sub">per puzzle</div></div>
+    </div>
+    <div class="grid-2 section">
+      <div class="card">
+        <div class="card-title">Accuracy by Difficulty Tier</div>
+        <div class="chart-wrap"><canvas id="chart-claude-haiku-4-5-tier"></canvas></div>
+      </div>
+      <div class="card">
+        <div class="card-title">Accuracy by Mate Type</div>
+        <div class="chart-wrap"><canvas id="chart-claude-haiku-4-5-mate"></canvas></div>
+      </div>
+    </div>
+    <div class="section card">
+      <div class="card-title">Score Distribution (300 puzzles)</div>
+      <div class="chart-wrap"><canvas id="chart-claude-haiku-4-5-dist"></canvas></div>
+    </div>
+  </div>
+
+  <!-- ── Pending tabs ── -->
+  <div id="panel-claude-sonnet-4-6" class="tab-panel">
+    <div class="pending-card">
+      <div style="font-size:32px">⏳</div>
+      <p>Claude Sonnet 4.6 is still running on AWS Fargate.</p>
+      <p style="margin-top:4px">Results will appear here when the benchmark completes.</p>
+    </div>
+  </div>
+
+  <div id="panel-claude-opus-4-7" class="tab-panel">
+    <div class="pending-card">
+      <div style="font-size:32px">⏳</div>
+      <p>Claude Opus 4.7 is still running on AWS Fargate.</p>
+      <p style="margin-top:4px">Results will appear here when the benchmark completes.</p>
+    </div>
+  </div>
+
+  <div id="panel-o3" class="tab-panel">
+    <div class="pending-card">
+      <div style="font-size:32px">⏳</div>
+      <p>o3 is still running on AWS Fargate (~10 hours due to deep reasoning).</p>
+      <p style="margin-top:4px">Results will appear here when the benchmark completes.</p>
+    </div>
+  </div>
+
+</div><!-- /container -->
+
+<script src="js/dashboard.js"></script>
+</body>
+</html>
