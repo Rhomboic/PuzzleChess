@@ -73,22 +73,34 @@ def extract_uci_moves(text: str) -> str:
 # ── Claude agent ──────────────────────────────────────────────────────────────
 
 def query_claude(client: anthropic.Anthropic, model: str, fen: str, mate_type: str) -> dict:
-    start = time.time()
-    response = client.messages.create(
-        model=model,
-        max_tokens=2048,
-        system=[
-            {
-                "type": "text",
-                "text": SYSTEM_PROMPT,
-                "cache_control": {"type": "ephemeral"},
-            }
-        ],
-        messages=[
-            {"role": "user", "content": build_user_prompt(fen, mate_type)},
-        ],
-    )
-    latency_ms = int((time.time() - start) * 1000)
+    import random
+    for attempt in range(5):
+        try:
+            start = time.time()
+            response = client.messages.create(
+                model=model,
+                max_tokens=2048,
+                system=[
+                    {
+                        "type": "text",
+                        "text": SYSTEM_PROMPT,
+                        "cache_control": {"type": "ephemeral"},
+                    }
+                ],
+                messages=[
+                    {"role": "user", "content": build_user_prompt(fen, mate_type)},
+                ],
+            )
+            latency_ms = int((time.time() - start) * 1000)
+            break
+        except Exception as e:
+            err = str(e)
+            if attempt < 4 and ("529" in err or "overloaded" in err.lower() or "Connection error" in err):
+                wait = 2 ** attempt + random.uniform(0, 1)
+                print(f" [retrying in {wait:.1f}s: {type(e).__name__}]", flush=True)
+                time.sleep(wait)
+            else:
+                raise
     raw = response.content[0].text
     return {
         "predicted_moves": extract_uci_moves(raw),
@@ -125,9 +137,10 @@ def query_openai(client: OpenAI, model: str, fen: str, mate_type: str) -> dict:
             latency_ms = int((time.time() - start) * 1000)
             break
         except Exception as e:
-            if "429" in str(e) and attempt < 4:
+            err = str(e)
+            if attempt < 4 and ("429" in err or "Connection error" in err or "APIConnectionError" in err):
                 wait = 2 ** attempt + random.uniform(0, 1)
-                print(f" [rate limit, retrying in {wait:.1f}s]", flush=True)
+                print(f" [retrying in {wait:.1f}s: {type(e).__name__}]", flush=True)
                 time.sleep(wait)
             else:
                 raise
