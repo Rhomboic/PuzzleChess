@@ -37,8 +37,8 @@ resource "aws_iam_role_policy" "github_actions_deploy" {
     Version = "2012-10-17"
     Statement = [
       {
-        Effect   = "Allow"
-        Action   = ["s3:PutObject", "s3:DeleteObject", "s3:ListBucket"]
+        Effect = "Allow"
+        Action = ["s3:PutObject", "s3:DeleteObject", "s3:ListBucket"]
         Resource = [
           aws_s3_bucket.dashboard.arn,
           "${aws_s3_bucket.dashboard.arn}/*"

@@ -15,11 +15,11 @@ resource "aws_s3_bucket_website_configuration" "dashboard" {
   bucket = aws_s3_bucket.dashboard.id
 
   index_document { suffix = "index.html" }
-  error_document  { key    = "index.html" }
+  error_document { key = "index.html" }
 }
 
 resource "aws_s3_bucket_policy" "dashboard" {
-  bucket = aws_s3_bucket.dashboard.id
+  bucket     = aws_s3_bucket.dashboard.id
   depends_on = [aws_s3_bucket_public_access_block.dashboard]
 
   policy = jsonencode({
