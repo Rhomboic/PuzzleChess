@@ -17,6 +17,7 @@ ANTHROPIC_MODELS = {
     "claude-haiku-4-5":  "claude-haiku-4-5-20251001",
     "claude-sonnet-4-6": "claude-sonnet-4-6",
     "claude-opus-4-7":   "claude-opus-4-7",
+    "claude-opus-4-8":   "claude-opus-4-8",
 }
 
 OPENAI_MODELS = {
