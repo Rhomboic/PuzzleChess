@@ -7,12 +7,98 @@
   <link rel="stylesheet" href="style.css" />
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
   <style>
-    #loading { display: none; text-align: center; padding: 60px; color: var(--text-muted); font-size: 14px; }
-    .spinner { width: 24px; height: 24px; border: 2px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.8s linear infinite; margin: 0 auto 12px; }
+    /* ── Loading overlay ── */
+    #overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 100;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 0;
+      transition: opacity 0.5s ease;
+    }
+    #overlay.hidden {
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    /* Blurred backdrop */
+    #overlay::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: rgba(13, 13, 13, 0.75);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+    }
+
+    /* Modal card */
+    .overlay-card {
+      position: relative;
+      z-index: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 32px;
+    }
+
+    /* Chess piece icon */
+    .chess-icon {
+      font-size: 56px;
+      line-height: 1;
+      filter: drop-shadow(0 0 24px rgba(0, 212, 255, 0.4));
+      animation: float 3s ease-in-out infinite;
+    }
+    @keyframes float {
+      0%, 100% { transform: translateY(0); }
+      50%       { transform: translateY(-8px); }
+    }
+
+    /* Title */
+    .overlay-title {
+      text-align: center;
+    }
+    .overlay-title h1 {
+      font-size: 32px;
+      font-weight: 700;
+      letter-spacing: -0.5px;
+      color: #e5e5e5;
+    }
+    .overlay-title h1 span { color: #00d4ff; }
+    .overlay-title p {
+      font-size: 13px;
+      color: #666;
+      margin-top: 6px;
+      letter-spacing: 0.3px;
+    }
+
+    /* Spinner */
+    .overlay-spinner {
+      width: 28px;
+      height: 28px;
+      border: 2px solid #2a2a2a;
+      border-top-color: #00d4ff;
+      border-radius: 50%;
+      animation: spin 0.9s linear infinite;
+    }
     @keyframes spin { to { transform: rotate(360deg); } }
   </style>
 </head>
 <body>
+
+<!-- ── Loading overlay ── -->
+<div id="overlay">
+  <div class="overlay-card">
+    <div class="chess-icon">♟</div>
+    <div class="overlay-title">
+      <h1>Puzzle<span>Chess</span></h1>
+      <p>LLM benchmark · 300 puzzles · 6 models</p>
+    </div>
+    <div class="overlay-spinner"></div>
+  </div>
+</div>
 
 <!-- ── Hero ── -->
 <div class="hero">
@@ -35,12 +121,6 @@
 <!-- ── Tabs ── -->
 <div class="container">
   <div class="tabs-bar" id="tabs-bar"></div>
-
-  <div id="loading">
-    <div class="spinner"></div>
-    Fetching results from S3...
-  </div>
-
   <div id="panels"></div>
 </div>
 

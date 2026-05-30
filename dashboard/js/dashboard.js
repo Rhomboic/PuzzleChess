@@ -250,8 +250,14 @@ function buildPendingPanel(key) {
 
 // ── Main ──────────────────────────────────────────────────────────────────────
 
+function dismissOverlay() {
+  const overlay = document.getElementById('overlay');
+  overlay.classList.add('hidden');
+  setTimeout(() => overlay.remove(), 500); // remove after fade
+}
+
 async function init() {
-  document.getElementById('loading').style.display = 'block';
+  const minDisplayTime = new Promise(resolve => setTimeout(resolve, 1000));
 
   const available = await fetchManifest();
 
@@ -267,7 +273,9 @@ async function init() {
     })
   );
 
-  document.getElementById('loading').style.display = 'none';
+  // Wait for both data and minimum display time
+  await minDisplayTime;
+  dismissOverlay();
 
   // Update chips
   document.getElementById('chip-models').textContent = Object.keys(loadedModels).length + ' / ' + allKeys.length + ' models';
