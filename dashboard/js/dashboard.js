@@ -1,6 +1,9 @@
 // ── Config ────────────────────────────────────────────────────────────────────
 
-const S3_BASE = 'https://puzzlechess-results-673981388599.s3.us-west-1.amazonaws.com/runs/';
+const IS_LOCAL = location.hostname === 'localhost' || location.hostname === '127.0.0.1';
+const S3_BASE  = IS_LOCAL
+  ? '../results/'
+  : 'https://puzzlechess-results-673981388599.s3.us-west-1.amazonaws.com/runs/';
 
 // Known models — label/provider/tier metadata only, no hardcoded results
 const MODEL_META = {
