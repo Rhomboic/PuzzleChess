@@ -15,6 +15,7 @@ variable "models" {
     "claude-haiku-4-5",
     "claude-sonnet-4-6",
     "claude-opus-4-7",
+    "claude-opus-4-8",
     "gpt-4.1-mini",
     "gpt-4.1",
     "o3",
