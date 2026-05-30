@@ -69,6 +69,23 @@ Chart.defaults.color = C_TEXT;
 Chart.defaults.borderColor = C_BORDER;
 Chart.defaults.font.family = 'Inter';
 
+// Bars grow from the baseline (not from the top-left corner) with a subtle
+// left-to-right stagger. Vertical bars rise from the bottom; horizontal bars
+// extend from the left. Scatter points just fade in.
+Chart.defaults.animation = { duration: 700, easing: 'easeOutQuart' };
+Chart.defaults.animations = {
+  y: {
+    from: (ctx) => (ctx.chart.scales.y ? ctx.chart.scales.y.getPixelForValue(0) : undefined),
+  },
+  x: {
+    from: (ctx) => (ctx.chart.scales.x ? ctx.chart.scales.x.getPixelForValue(0) : undefined),
+  },
+};
+// Per-bar left-to-right stagger via delay.
+Chart.defaults.datasets.bar.animation = {
+  delay: (ctx) => (ctx.type === 'data' && ctx.mode === 'default' ? ctx.dataIndex * 80 : 0),
+};
+
 function modelColor(key) {
   return (MODEL_META[key] || {}).provider === 'claude' ? C_PURPLE : C_ACCENT;
 }
