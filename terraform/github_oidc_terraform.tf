@@ -53,6 +53,7 @@ resource "aws_iam_role_policy" "github_actions_terraform" {
           "acm:*",
           "cloudfront:*",
           "route53:*",
+          "route53domains:*",
           "secretsmanager:*",
           "logs:*",
           "sts:GetCallerIdentity",
