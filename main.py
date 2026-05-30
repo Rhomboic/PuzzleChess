@@ -19,6 +19,7 @@ Environment variables:
 
 import os
 import sys
+import json
 import boto3
 from dotenv import load_dotenv
 
@@ -42,6 +43,31 @@ def upload_to_s3(local_path: str, model: str) -> None:
     s3 = boto3.client("s3")
     s3.upload_file(local_path, bucket, s3_key)
     print(f"  Upload complete")
+
+    update_manifest(s3, model, bucket, prefix)
+
+
+def update_manifest(s3, model: str, bucket: str, prefix: str) -> None:
+    """Add this model to the manifest.json in S3 so the dashboard knows it exists."""
+    key = f"{prefix}manifest.json"
+    try:
+        obj = s3.get_object(Bucket=bucket, Key=key)
+        models = json.loads(obj["Body"].read())
+    except s3.exceptions.NoSuchKey:
+        models = []
+    except Exception:
+        models = []
+
+    if model not in models:
+        models.append(model)
+
+    s3.put_object(
+        Bucket=bucket,
+        Key=key,
+        Body=json.dumps(models),
+        ContentType="application/json",
+    )
+    print(f"  Manifest updated: {models}")
 
 
 def main():

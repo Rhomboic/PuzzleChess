@@ -1,284 +1,300 @@
-// ── Data ─────────────────────────────────────────────────────────────────────
+// ── Config ────────────────────────────────────────────────────────────────────
 
-const MODELS = {
-  'gpt-4.1-mini': {
-    label: 'GPT-4.1 Mini',
-    provider: 'openai',
-    tier: 'Fast / Cheap',
-    accuracy: 0.0167,
-    avg_score: 0.2704,
-    avg_valid_ratio: 0.238,
-    format_compliance_rate: 0.8433,
-    avg_latency_ms: 1420,
-    avg_input_tokens: 252,
-    avg_output_tokens: 95,
-    accuracy_by_tier: { beginner: 0.04, intermediate: 0.0133, advanced: 0.0133, expert: 0.0 },
-    accuracy_by_mate_type: { mateIn1: 0.0833, mateIn2: 0.0, mateIn3: 0.0, mateIn4: 0.0, mateIn5: 0.0 },
-    score_dist: [33, 132, 54, 30, 8, 38, 0, 0, 0, 5],
-  },
-  'gpt-4.1': {
-    label: 'GPT-4.1',
-    provider: 'openai',
-    tier: 'Mid',
-    accuracy: 0.0633,
-    avg_score: 0.3552,
-    avg_valid_ratio: 0.4064,
-    format_compliance_rate: 0.87,
-    avg_latency_ms: 751,
-    avg_input_tokens: 252,
-    avg_output_tokens: 25,
-    accuracy_by_tier: { beginner: 0.12, intermediate: 0.0533, advanced: 0.04, expert: 0.04 },
-    accuracy_by_mate_type: { mateIn1: 0.25, mateIn2: 0.0333, mateIn3: 0.0167, mateIn4: 0.0167, mateIn5: 0.0 },
-    score_dist: [28, 70, 44, 60, 26, 53, 0, 0, 0, 19],
-  },
-  'claude-haiku-4-5': {
-    label: 'Claude Haiku 4.5',
-    provider: 'claude',
-    tier: 'Fast / Cheap',
-    accuracy: 0.0167,
-    avg_score: 0.1759,
-    avg_valid_ratio: 0.147,
-    format_compliance_rate: 0.4467,
-    avg_latency_ms: 8330,
-    avg_input_tokens: 270,
-    avg_output_tokens: 899,
-    accuracy_by_tier: { beginner: 0.0533, intermediate: 0.0133, advanced: 0.0, expert: 0.0 },
-    accuracy_by_mate_type: { mateIn1: 0.0833, mateIn2: 0.0, mateIn3: 0.0, mateIn4: 0.0, mateIn5: 0.0 },
-    score_dist: [144, 78, 43, 7, 5, 18, 0, 0, 0, 5],
-  },
-  'claude-sonnet-4-6': { label: 'Claude Sonnet 4.6', provider: 'claude', tier: 'Mid', pending: true },
-  'claude-opus-4-7':   { label: 'Claude Opus 4.7',   provider: 'claude', tier: 'Flagship', pending: true },
-  'o3':                { label: 'o3',                 provider: 'openai', tier: 'Reasoning', pending: true },
+const S3_BASE = 'https://puzzlechess-results-673981388599.s3.us-west-1.amazonaws.com/runs/';
+
+// Known models — label/provider/tier metadata only, no hardcoded results
+const MODEL_META = {
+  'claude-haiku-4-5':  { label: 'Claude Haiku 4.5',  provider: 'claude', tier: 'Fast / Cheap' },
+  'claude-sonnet-4-6': { label: 'Claude Sonnet 4.6', provider: 'claude', tier: 'Mid' },
+  'claude-opus-4-7':   { label: 'Claude Opus 4.7',   provider: 'claude', tier: 'Flagship' },
+  'gpt-4.1-mini':      { label: 'GPT-4.1 Mini',      provider: 'openai', tier: 'Fast / Cheap' },
+  'gpt-4.1':           { label: 'GPT-4.1',            provider: 'openai', tier: 'Mid' },
+  'o3':                { label: 'o3',                  provider: 'openai', tier: 'Reasoning' },
 };
 
-const TIERS     = ['beginner', 'intermediate', 'advanced', 'expert'];
+const TIERS      = ['beginner', 'intermediate', 'advanced', 'expert'];
 const MATE_TYPES = ['mateIn1', 'mateIn2', 'mateIn3', 'mateIn4', 'mateIn5'];
 
-const C_ACCENT  = '#00d4ff';
-const C_PURPLE  = '#7c3aed';
-const C_GREEN   = '#10b981';
-const C_MUTED   = '#555';
-const C_BORDER  = '#2a2a2a';
-const C_TEXT    = '#888';
+const C_ACCENT = '#00d4ff';
+const C_PURPLE = '#7c3aed';
+const C_BORDER = '#2a2a2a';
+const C_TEXT   = '#888';
 
 Chart.defaults.color = C_TEXT;
 Chart.defaults.borderColor = C_BORDER;
 Chart.defaults.font.family = 'Inter';
 
+function modelColor(key) {
+  return (MODEL_META[key] || {}).provider === 'claude' ? C_PURPLE : C_ACCENT;
+}
+
 function pct(v)  { return (v * 100).toFixed(1) + '%'; }
-function ms(v)   { return v >= 1000 ? (v/1000).toFixed(1) + 's' : Math.round(v) + 'ms'; }
-function modelColor(m) { return MODELS[m].provider === 'openai' ? C_ACCENT : C_PURPLE; }
+function ms(v)   { return v >= 1000 ? (v / 1000).toFixed(1) + 's' : Math.round(v) + 'ms'; }
+function slug(k) { return k.replace(/\./g, '-'); }
 
-// ── Tab switching ─────────────────────────────────────────────────────────────
+// ── Fetch helpers ─────────────────────────────────────────────────────────────
 
-function initTabs() {
-  document.querySelectorAll('.tab-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-      const target = btn.dataset.tab;
-      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-      document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
-      btn.classList.add('active');
-      document.getElementById('panel-' + target).classList.add('active');
-    });
-  });
+async function fetchManifest() {
+  try {
+    const res = await fetch(S3_BASE + 'manifest.json');
+    if (!res.ok) return [];
+    return await res.json();
+  } catch {
+    return [];
+  }
+}
+
+async function fetchModel(key) {
+  try {
+    const res = await fetch(`${S3_BASE}${key}_results.json`);
+    if (!res.ok) return null;
+    return await res.json();
+  } catch {
+    return null;
+  }
+}
+
+// ── Tab system ────────────────────────────────────────────────────────────────
+
+function createTab(key, label, pending) {
+  const btn = document.createElement('button');
+  btn.className = 'tab-btn' + (pending ? ' pending' : '');
+  btn.dataset.tab = slug(key);
+  btn.textContent = label;
+  btn.addEventListener('click', () => switchTab(slug(key)));
+  document.getElementById('tabs-bar').appendChild(btn);
+}
+
+function createPanel(key) {
+  const div = document.createElement('div');
+  div.id = 'panel-' + slug(key);
+  div.className = 'tab-panel';
+  document.getElementById('panels').appendChild(div);
+  return div;
+}
+
+function switchTab(tabKey) {
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  const btn = document.querySelector(`[data-tab="${tabKey}"]`);
+  const panel = document.getElementById('panel-' + tabKey);
+  if (btn) btn.classList.add('active');
+  if (panel) panel.classList.add('active');
 }
 
 // ── Overview charts ───────────────────────────────────────────────────────────
 
-function buildOverviewCharts() {
-  const active = Object.entries(MODELS).filter(([,m]) => !m.pending);
-  const labels  = active.map(([,m]) => m.label);
-  const colors  = active.map(([k]) => modelColor(k));
+function buildOverview(loadedModels) {
+  const panel = document.getElementById('panel-overview');
+  panel.innerHTML = `
+    <div class="section card">
+      <div class="card-title">Model Comparison</div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr>
+            <th>Model</th><th>Accuracy</th><th>Avg Score</th>
+            <th>Valid Ratio</th><th>Format Compliance</th><th>Avg Latency</th><th>Output Tokens</th>
+          </tr></thead>
+          <tbody id="overview-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+    <div class="grid-2 section">
+      <div class="card"><div class="card-title">Accuracy by Model</div><div class="chart-wrap"><canvas id="chart-accuracy"></canvas></div></div>
+      <div class="card"><div class="card-title">Avg Score by Model</div><div class="chart-wrap"><canvas id="chart-score"></canvas></div></div>
+    </div>
+    <div class="grid-2 section">
+      <div class="card"><div class="card-title">Latency vs Accuracy</div><div class="chart-wrap"><canvas id="chart-scatter"></canvas></div></div>
+      <div class="card"><div class="card-title">Format Compliance Rate</div><div class="chart-wrap"><canvas id="chart-format"></canvas></div></div>
+    </div>
+  `;
 
-  // Accuracy bar
+  const tbody = document.getElementById('overview-tbody');
+
+  // All known models in defined order
+  Object.keys(MODEL_META).forEach(key => {
+    const meta = MODEL_META[key];
+    const data = loadedModels[key];
+    const s = data?.summary;
+    const badgeClass = meta.provider === 'claude' ? 'badge-claude' : 'badge-openai';
+    const provider = meta.provider === 'claude' ? 'Anthropic' : 'OpenAI';
+
+    tbody.innerHTML += `<tr class="${data ? '' : 'pending-row'}">
+      <td><span class="model-name">${meta.label}</span><span class="badge ${data ? badgeClass : 'badge-pending'}">${data ? provider : 'Pending'}</span></td>
+      <td>${s ? pct(s.overall_accuracy) : '—'}</td>
+      <td>${s ? s.avg_score.toFixed(3) : '—'}</td>
+      <td>${s ? pct(s.avg_valid_ratio) : '—'}</td>
+      <td>${s ? pct(s.format_compliance_rate ?? 0) : '—'}</td>
+      <td>${s ? ms(s.avg_latency_ms) : '—'}</td>
+      <td>${s ? Math.round(s.avg_output_tokens) : '—'}</td>
+    </tr>`;
+  });
+
+  const active = Object.entries(loadedModels);
+  if (active.length === 0) return;
+
+  const labels = active.map(([k]) => MODEL_META[k]?.label || k);
+  const colors = active.map(([k]) => modelColor(k));
+
   new Chart(document.getElementById('chart-accuracy'), {
     type: 'bar',
-    data: {
-      labels,
-      datasets: [{
-        label: 'Accuracy',
-        data: active.map(([,m]) => +(m.accuracy * 100).toFixed(1)),
-        backgroundColor: colors.map(c => c + '33'),
-        borderColor: colors,
-        borderWidth: 2,
-        borderRadius: 4,
-      }]
-    },
-    options: {
-      responsive: true,
-      plugins: { legend: { display: false } },
-      scales: {
-        y: { ticks: { callback: v => v + '%' }, grid: { color: C_BORDER } },
-        x: { grid: { display: false } }
-      }
-    }
+    data: { labels, datasets: [{ label: 'Accuracy', data: active.map(([,d]) => +(d.summary.overall_accuracy * 100).toFixed(1)), backgroundColor: colors.map(c => c + '33'), borderColor: colors, borderWidth: 2, borderRadius: 4 }] },
+    options: { responsive: true, plugins: { legend: { display: false } }, scales: { y: { ticks: { callback: v => v + '%' }, grid: { color: C_BORDER } }, x: { grid: { display: false } } } }
   });
 
-  // Avg score bar
   new Chart(document.getElementById('chart-score'), {
     type: 'bar',
-    data: {
-      labels,
-      datasets: [{
-        label: 'Avg Score',
-        data: active.map(([,m]) => +(m.avg_score).toFixed(3)),
-        backgroundColor: colors.map(c => c + '33'),
-        borderColor: colors,
-        borderWidth: 2,
-        borderRadius: 4,
-      }]
-    },
-    options: {
-      responsive: true,
-      plugins: { legend: { display: false } },
-      scales: {
-        y: { min: 0, max: 1, grid: { color: C_BORDER } },
-        x: { grid: { display: false } }
-      }
-    }
+    data: { labels, datasets: [{ label: 'Avg Score', data: active.map(([,d]) => +d.summary.avg_score.toFixed(3)), backgroundColor: colors.map(c => c + '33'), borderColor: colors, borderWidth: 2, borderRadius: 4 }] },
+    options: { responsive: true, plugins: { legend: { display: false } }, scales: { y: { min: 0, max: 1, grid: { color: C_BORDER } }, x: { grid: { display: false } } } }
   });
 
-  // Latency vs Accuracy scatter
   new Chart(document.getElementById('chart-scatter'), {
     type: 'scatter',
     data: {
-      datasets: active.map(([k, m]) => ({
-        label: m.label,
-        data: [{ x: m.avg_latency_ms / 1000, y: +(m.accuracy * 100).toFixed(1) }],
-        backgroundColor: modelColor(k) + '99',
-        borderColor: modelColor(k),
-        pointRadius: 10,
-        pointHoverRadius: 13,
+      datasets: active.map(([k, d]) => ({
+        label: MODEL_META[k]?.label || k,
+        data: [{ x: +(d.summary.avg_latency_ms / 1000).toFixed(2), y: +(d.summary.overall_accuracy * 100).toFixed(1) }],
+        backgroundColor: modelColor(k) + '99', borderColor: modelColor(k), pointRadius: 10, pointHoverRadius: 13,
       }))
     },
     options: {
       responsive: true,
-      plugins: {
-        legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 11 } } },
-        tooltip: {
-          callbacks: {
-            label: ctx => `${ctx.dataset.label}: ${ctx.parsed.y}% accuracy @ ${ctx.parsed.x.toFixed(1)}s`
-          }
-        }
-      },
-      scales: {
-        x: { title: { display: true, text: 'Avg Latency (s)', color: C_TEXT }, grid: { color: C_BORDER } },
-        y: { title: { display: true, text: 'Accuracy (%)', color: C_TEXT }, grid: { color: C_BORDER } }
-      }
+      plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 11 } } }, tooltip: { callbacks: { label: ctx => `${ctx.dataset.label}: ${ctx.parsed.y}% @ ${ctx.parsed.x}s` } } },
+      scales: { x: { title: { display: true, text: 'Avg Latency (s)', color: C_TEXT }, grid: { color: C_BORDER } }, y: { title: { display: true, text: 'Accuracy (%)', color: C_TEXT }, grid: { color: C_BORDER } } }
     }
   });
 
-  // Format compliance bar
   new Chart(document.getElementById('chart-format'), {
     type: 'bar',
-    data: {
-      labels,
-      datasets: [{
-        label: 'Format Compliance',
-        data: active.map(([,m]) => +(m.format_compliance_rate * 100).toFixed(1)),
-        backgroundColor: colors.map(c => c + '33'),
-        borderColor: colors,
-        borderWidth: 2,
-        borderRadius: 4,
-      }]
-    },
-    options: {
-      responsive: true,
-      plugins: { legend: { display: false } },
-      scales: {
-        y: { min: 0, max: 100, ticks: { callback: v => v + '%' }, grid: { color: C_BORDER } },
-        x: { grid: { display: false } }
-      }
-    }
+    data: { labels, datasets: [{ label: 'Format Compliance', data: active.map(([,d]) => +((d.summary.format_compliance_rate ?? 0) * 100).toFixed(1)), backgroundColor: colors.map(c => c + '33'), borderColor: colors, borderWidth: 2, borderRadius: 4 }] },
+    options: { responsive: true, plugins: { legend: { display: false } }, scales: { y: { min: 0, max: 100, ticks: { callback: v => v + '%' }, grid: { color: C_BORDER } }, x: { grid: { display: false } } } }
   });
 }
 
-// ── Per-model charts ──────────────────────────────────────────────────────────
+// ── Per-model panel ───────────────────────────────────────────────────────────
 
-function buildModelCharts(key) {
-  const m = MODELS[key];
-  if (m.pending) return;
+function buildModelPanel(key, data) {
+  const meta = MODEL_META[key] || { label: key, provider: 'openai', tier: '' };
+  const s = data.summary;
   const color = modelColor(key);
-
-  // Accuracy by tier
-  new Chart(document.getElementById(`chart-${key}-tier`), {
-    type: 'bar',
-    data: {
-      labels: TIERS.map(t => t.charAt(0).toUpperCase() + t.slice(1)),
-      datasets: [{
-        label: 'Accuracy',
-        data: TIERS.map(t => +(m.accuracy_by_tier[t] * 100).toFixed(1)),
-        backgroundColor: color + '33',
-        borderColor: color,
-        borderWidth: 2,
-        borderRadius: 4,
-      }]
-    },
-    options: {
-      indexAxis: 'y',
-      responsive: true,
-      plugins: { legend: { display: false } },
-      scales: {
-        x: { ticks: { callback: v => v + '%' }, grid: { color: C_BORDER } },
-        y: { grid: { display: false } }
-      }
-    }
-  });
-
-  // Accuracy by mate type
-  new Chart(document.getElementById(`chart-${key}-mate`), {
-    type: 'bar',
-    data: {
-      labels: MATE_TYPES,
-      datasets: [{
-        label: 'Accuracy',
-        data: MATE_TYPES.map(t => +(m.accuracy_by_mate_type[t] * 100).toFixed(1)),
-        backgroundColor: color + '33',
-        borderColor: color,
-        borderWidth: 2,
-        borderRadius: 4,
-      }]
-    },
-    options: {
-      indexAxis: 'y',
-      responsive: true,
-      plugins: { legend: { display: false } },
-      scales: {
-        x: { ticks: { callback: v => v + '%' }, grid: { color: C_BORDER } },
-        y: { grid: { display: false } }
-      }
-    }
-  });
+  const badgeStyle = meta.provider === 'claude'
+    ? 'background:rgba(124,58,237,0.15);color:#7c3aed'
+    : 'background:rgba(0,212,255,0.15);color:#00d4ff';
+  const provider = meta.provider === 'claude' ? 'Anthropic' : 'OpenAI';
+  const sk = slug(key);
 
   // Score distribution
-  new Chart(document.getElementById(`chart-${key}-dist`), {
+  const buckets = Array(10).fill(0);
+  data.puzzles.forEach(p => { buckets[Math.min(Math.floor(p.score * 10), 9)]++; });
+
+  const panel = document.getElementById('panel-' + sk);
+  panel.innerHTML = `
+    <div class="model-header">
+      <h2>${meta.label}</h2>
+      <span style="${badgeStyle};border-radius:20px;padding:4px 12px;font-size:11px;font-weight:600;text-transform:uppercase">${provider} · ${meta.tier}</span>
+    </div>
+    <div class="stat-grid">
+      <div class="stat-card"><div class="stat-label">Accuracy</div><div class="stat-value" style="color:${color}">${pct(s.overall_accuracy)}</div><div class="stat-sub">${Math.round(s.overall_accuracy * 300)} / 300 correct</div></div>
+      <div class="stat-card"><div class="stat-label">Avg Score</div><div class="stat-value muted">${s.avg_score.toFixed(3)}</div><div class="stat-sub">weighted composite</div></div>
+      <div class="stat-card"><div class="stat-label">Format Compliance</div><div class="stat-value" style="color:${color}">${pct(s.format_compliance_rate ?? 0)}</div><div class="stat-sub">followed UCI instructions</div></div>
+      <div class="stat-card"><div class="stat-label">Avg Latency</div><div class="stat-value muted">${ms(s.avg_latency_ms)}</div><div class="stat-sub">per puzzle</div></div>
+    </div>
+    <div class="grid-2 section">
+      <div class="card"><div class="card-title">Accuracy by Difficulty Tier</div><div class="chart-wrap"><canvas id="chart-${sk}-tier"></canvas></div></div>
+      <div class="card"><div class="card-title">Accuracy by Mate Type</div><div class="chart-wrap"><canvas id="chart-${sk}-mate"></canvas></div></div>
+    </div>
+    <div class="section card"><div class="card-title">Score Distribution (300 puzzles)</div><div class="chart-wrap"><canvas id="chart-${sk}-dist"></canvas></div></div>
+  `;
+
+  const barOpts = (horizontal) => ({
     type: 'bar',
-    data: {
-      labels: ['0-0.1','0.1-0.2','0.2-0.3','0.3-0.4','0.4-0.5','0.5-0.6','0.6-0.7','0.7-0.8','0.8-0.9','0.9-1.0'],
-      datasets: [{
-        label: 'Puzzles',
-        data: m.score_dist,
-        backgroundColor: color + '44',
-        borderColor: color,
-        borderWidth: 1,
-        borderRadius: 2,
-      }]
-    },
     options: {
+      indexAxis: horizontal ? 'y' : 'x',
       responsive: true,
       plugins: { legend: { display: false } },
       scales: {
-        y: { grid: { color: C_BORDER } },
-        x: { grid: { display: false }, ticks: { font: { size: 10 } } }
+        [horizontal ? 'x' : 'y']: { ticks: { callback: v => v + '%' }, grid: { color: C_BORDER } },
+        [horizontal ? 'y' : 'x']: { grid: { display: false } }
       }
     }
   });
+
+  new Chart(document.getElementById(`chart-${sk}-tier`), {
+    ...barOpts(true),
+    data: { labels: TIERS.map(t => t.charAt(0).toUpperCase() + t.slice(1)), datasets: [{ label: 'Accuracy', data: TIERS.map(t => +((s.accuracy_by_tier[t] ?? 0) * 100).toFixed(1)), backgroundColor: color + '33', borderColor: color, borderWidth: 2, borderRadius: 4 }] }
+  });
+
+  new Chart(document.getElementById(`chart-${sk}-mate`), {
+    ...barOpts(true),
+    data: { labels: MATE_TYPES, datasets: [{ label: 'Accuracy', data: MATE_TYPES.map(t => +((s.accuracy_by_mate_type[t] ?? 0) * 100).toFixed(1)), backgroundColor: color + '33', borderColor: color, borderWidth: 2, borderRadius: 4 }] }
+  });
+
+  new Chart(document.getElementById(`chart-${sk}-dist`), {
+    type: 'bar',
+    data: { labels: ['0-.1','.1-.2','.2-.3','.3-.4','.4-.5','.5-.6','.6-.7','.7-.8','.8-.9','.9-1'], datasets: [{ label: 'Puzzles', data: buckets, backgroundColor: color + '44', borderColor: color, borderWidth: 1, borderRadius: 2 }] },
+    options: { responsive: true, plugins: { legend: { display: false } }, scales: { y: { grid: { color: C_BORDER } }, x: { grid: { display: false }, ticks: { font: { size: 10 } } } } }
+  });
 }
 
-// ── Init ──────────────────────────────────────────────────────────────────────
+function buildPendingPanel(key) {
+  const meta = MODEL_META[key] || { label: key };
+  const panel = document.getElementById('panel-' + slug(key));
+  panel.innerHTML = `
+    <div class="pending-card">
+      <div style="font-size:32px">⏳</div>
+      <p>${meta.label} hasn't completed its benchmark run yet.</p>
+      <p style="margin-top:4px">Results will appear here automatically once uploaded to S3.</p>
+    </div>
+  `;
+}
 
-document.addEventListener('DOMContentLoaded', () => {
-  initTabs();
-  buildOverviewCharts();
-  Object.keys(MODELS).forEach(k => buildModelCharts(k));
-});
+// ── Main ──────────────────────────────────────────────────────────────────────
+
+async function init() {
+  document.getElementById('loading').style.display = 'block';
+
+  const available = await fetchManifest();
+
+  // Determine full model list: known models + any unknown ones from manifest
+  const allKeys = [...new Set([...Object.keys(MODEL_META), ...available])];
+
+  // Fetch data for available models
+  const loadedModels = {};
+  await Promise.all(
+    available.map(async key => {
+      const data = await fetchModel(key);
+      if (data) loadedModels[key] = data;
+    })
+  );
+
+  document.getElementById('loading').style.display = 'none';
+
+  // Update chips
+  document.getElementById('chip-models').textContent = Object.keys(loadedModels).length + ' / ' + allKeys.length + ' models';
+
+  // Build overview tab first
+  createTab('overview', 'Overview', false);
+  const overviewPanel = document.createElement('div');
+  overviewPanel.id = 'panel-overview';
+  overviewPanel.className = 'tab-panel';
+  document.getElementById('panels').appendChild(overviewPanel);
+  buildOverview(loadedModels);
+
+  // Build per-model tabs
+  allKeys.forEach(key => {
+    const meta = MODEL_META[key] || { label: key };
+    const hasData = !!loadedModels[key];
+    createTab(key, meta.label, !hasData);
+    createPanel(key);
+    if (hasData) {
+      buildModelPanel(key, loadedModels[key]);
+    } else {
+      buildPendingPanel(key);
+    }
+  });
+
+  // Activate overview
+  switchTab('overview');
+}
+
+document.addEventListener('DOMContentLoaded', init);
