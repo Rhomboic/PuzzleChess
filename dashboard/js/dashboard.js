@@ -399,14 +399,22 @@ function buildPendingPanel(key) {
 
 // ── Main ──────────────────────────────────────────────────────────────────────
 
-function dismissOverlay() {
+const wait = ms => new Promise(r => setTimeout(r, ms));
+
+async function dismissOverlay() {
   const overlay = document.getElementById('overlay');
+  const stage = document.getElementById('overlay-stage');
+  // Cross-fade the title into the icon, hold briefly, then fade the modal out.
+  stage.classList.add('to-icon');
+  await wait(650);
   overlay.classList.add('hidden');
-  setTimeout(() => overlay.remove(), 500); // remove after fade
+  await wait(500);
+  overlay.remove();
 }
 
 async function init() {
-  const minDisplayTime = new Promise(resolve => setTimeout(resolve, 1000));
+  // Show the title at least 500ms before the text->icon transition begins.
+  const minTitleTime = wait(500);
 
   const available = await fetchManifest();
 
@@ -422,9 +430,9 @@ async function init() {
     })
   );
 
-  // Wait for both data and minimum display time
-  await minDisplayTime;
-  dismissOverlay();
+  // Wait for the minimum title display, then run the icon transition + dismiss.
+  await minTitleTime;
+  await dismissOverlay();
 
   // Update chips
   document.getElementById('chip-models').textContent = Object.keys(loadedModels).length + ' / ' + allKeys.length + ' models';
