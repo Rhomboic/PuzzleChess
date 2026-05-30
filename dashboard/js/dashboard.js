@@ -142,6 +142,55 @@ function totalRunTime(data) {
 function buildOverview(loadedModels) {
   const panel = document.getElementById('panel-overview');
   panel.innerHTML = `
+    <details class="section card methodology" open>
+      <summary>
+        <span class="card-title" style="display:inline;cursor:pointer">Methodology</span>
+        <span class="method-toggle">▸</span>
+      </summary>
+      <div class="method-body">
+
+        <div class="method-section">
+          <h3>Dataset</h3>
+          <p>300 puzzles sampled from the <a href="https://database.lichess.org/#puzzles" target="_blank">Lichess open puzzle database</a> (~6M puzzles). Filtered for checkmate puzzles only, evenly distributed across <strong>5 mate types</strong> (mateIn1 to mateIn5) by <strong>4 difficulty tiers</strong> (15 puzzles each = 300 total).</p>
+          <div class="method-grid">
+            <div class="method-item"><span class="method-label">Beginner</span><span class="method-val">&lt; 1200 Elo</span></div>
+            <div class="method-item"><span class="method-label">Intermediate</span><span class="method-val">1200 to 1600 Elo</span></div>
+            <div class="method-item"><span class="method-label">Advanced</span><span class="method-val">1600 to 2000 Elo</span></div>
+            <div class="method-item"><span class="method-label">Expert</span><span class="method-val">2000+ Elo</span></div>
+          </div>
+        </div>
+
+        <div class="method-section">
+          <h3>Puzzle Format</h3>
+          <p>Each puzzle is presented as a FEN board position with the opponent's setup move already applied. The model must output the full mating sequence in <strong>UCI notation</strong> (e.g. <code>e2e4 d7d5 f1b5</code>), including both its own moves and the opponent's forced responses.</p>
+        </div>
+
+        <div class="method-section">
+          <h3>Eval Metrics</h3>
+          <div class="method-grid">
+            <div class="method-item"><span class="method-label">Accuracy</span><span class="method-val">Exact match of full move sequence (binary)</span></div>
+            <div class="method-item"><span class="method-label">Valid Ratio</span><span class="method-val">Share of predicted moves that are legal in the position (validated with python-chess)</span></div>
+            <div class="method-item"><span class="method-label">Format Compliance</span><span class="method-val">Output was the right number of well-formed UCI moves, capturing both notation (e.g. e2e4, not Rxf8#) and sequence length</span></div>
+            <div class="method-item"><span class="method-label">Latency</span><span class="method-val">Wall clock time of the API call</span></div>
+          </div>
+        </div>
+
+        <div class="method-section">
+          <h3>Composite Score Formula</h3>
+          <div class="formula">
+            score = 0.45 × correct + 0.35 × valid_ratio + 0.10 × (1 − norm_latency) + 0.10 × format_followed
+          </div>
+          <p style="margin-top:10px;font-size:12px;color:var(--text-muted)">Correctness is the dominant signal. Valid ratio gives partial credit for legal but incorrect sequences. Latency is normalized against a 30s cap. Format compliance rewards models that follow output instructions.</p>
+        </div>
+
+        <div class="method-section">
+          <h3>Infrastructure</h3>
+          <p>Each model runs in its own Docker container on <strong>AWS ECS Fargate</strong> in parallel. Results are written to S3 as JSON. API keys are stored in <strong>AWS Secrets Manager</strong> and injected at runtime. Infrastructure provisioned via <strong>Terraform</strong>.</p>
+        </div>
+
+      </div>
+    </details>
+
     <div class="section card">
       <div class="card-title">Model Comparison</div>
       <div class="table-wrap">
@@ -168,55 +217,6 @@ function buildOverview(loadedModels) {
       <div class="card-desc">Total wall-clock API time to complete the full benchmark — sum of all 300 puzzle latencies</div>
       <div class="chart-wrap"><canvas id="chart-runtime"></canvas></div>
     </div>
-
-    <details class="section card methodology">
-      <summary>
-        <span class="card-title" style="display:inline;cursor:pointer">Methodology</span>
-        <span class="method-toggle">▸</span>
-      </summary>
-      <div class="method-body">
-
-        <div class="method-section">
-          <h3>Dataset</h3>
-          <p>300 puzzles sampled from the <a href="https://database.lichess.org/#puzzles" target="_blank">Lichess open puzzle database</a> (~6M puzzles). Filtered for checkmate puzzles only, evenly distributed across <strong>5 mate types</strong> (mateIn1–mateIn5) × <strong>4 difficulty tiers</strong> (15 puzzles each = 300 total).</p>
-          <div class="method-grid">
-            <div class="method-item"><span class="method-label">Beginner</span><span class="method-val">&lt; 1200 Elo</span></div>
-            <div class="method-item"><span class="method-label">Intermediate</span><span class="method-val">1200–1600 Elo</span></div>
-            <div class="method-item"><span class="method-label">Advanced</span><span class="method-val">1600–2000 Elo</span></div>
-            <div class="method-item"><span class="method-label">Expert</span><span class="method-val">2000+ Elo</span></div>
-          </div>
-        </div>
-
-        <div class="method-section">
-          <h3>Puzzle Format</h3>
-          <p>Each puzzle is presented as a FEN board position with the opponent's setup move already applied. The model must output the full mating sequence in <strong>UCI notation</strong> (e.g. <code>e2e4 d7d5 f1b5</code>), including both its own moves and the opponent's forced responses.</p>
-        </div>
-
-        <div class="method-section">
-          <h3>Eval Metrics</h3>
-          <div class="method-grid">
-            <div class="method-item"><span class="method-label">Accuracy</span><span class="method-val">Exact match of full move sequence (binary)</span></div>
-            <div class="method-item"><span class="method-label">Valid Ratio</span><span class="method-val">Share of predicted moves that are legal in the position (validated with python-chess)</span></div>
-            <div class="method-item"><span class="method-label">Format Compliance</span><span class="method-val">Output was the right number of well-formed UCI moves — captures both notation (e.g. e2e4, not Rxf8#) and sequence length</span></div>
-            <div class="method-item"><span class="method-label">Latency</span><span class="method-val">Wall clock time of the API call</span></div>
-          </div>
-        </div>
-
-        <div class="method-section">
-          <h3>Composite Score Formula</h3>
-          <div class="formula">
-            score = 0.45 × correct + 0.35 × valid_ratio + 0.10 × (1 − norm_latency) + 0.10 × format_followed
-          </div>
-          <p style="margin-top:10px;font-size:12px;color:var(--text-muted)">Correctness is the dominant signal. Valid ratio gives partial credit for legal but incorrect sequences. Latency is normalized against a 30s cap. Format compliance rewards models that follow output instructions.</p>
-        </div>
-
-        <div class="method-section">
-          <h3>Infrastructure</h3>
-          <p>Each model runs in its own Docker container on <strong>AWS ECS Fargate</strong> — all 6 in parallel. Results are written to S3 as JSON. API keys are stored in <strong>AWS Secrets Manager</strong> and injected at runtime. Infrastructure provisioned via <strong>Terraform</strong>.</p>
-        </div>
-
-      </div>
-    </details>
   `;
 
   const tbody = document.getElementById('overview-tbody');
