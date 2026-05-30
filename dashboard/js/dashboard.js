@@ -69,13 +69,10 @@ Chart.defaults.color = C_TEXT;
 Chart.defaults.borderColor = C_BORDER;
 Chart.defaults.font.family = 'Inter';
 
-// Per-bar left-to-right stagger delay (shared by all bar charts).
-const barDelay = (ctx) => (ctx.type === 'data' && ctx.mode === 'default' ? ctx.dataIndex * 80 : 0);
-
 // Vertical bars: freeze the category (x) axis so bars don't slide in from the
-// corner, and grow each bar's height up from the baseline.
+// corner, and grow each bar's height up from the baseline (all together).
 const growUp = {
-  animation: { duration: 700, easing: 'easeOutQuart', delay: barDelay },
+  animation: { duration: 700, easing: 'easeOutQuart' },
   animations: {
     x: { duration: 0 },
     y: { from: (ctx) => (ctx.chart.scales.y ? ctx.chart.scales.y.getPixelForValue(0) : 0) },
@@ -84,7 +81,7 @@ const growUp = {
 
 // Horizontal bars: freeze the category (y) axis and grow each bar's width from the left.
 const growRight = {
-  animation: { duration: 700, easing: 'easeOutQuart', delay: barDelay },
+  animation: { duration: 700, easing: 'easeOutQuart' },
   animations: {
     y: { duration: 0 },
     x: { from: (ctx) => (ctx.chart.scales.x ? ctx.chart.scales.x.getPixelForValue(0) : 0) },
