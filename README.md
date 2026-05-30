@@ -22,7 +22,33 @@ An LLM agent benchmark that evaluates how well AI models solve chess puzzles. Ru
 
 ## Results
 
-📊 **[View full benchmark results and interactive charts → chess.adamissah.com](https://chess.adamissah.com)**
+📊 **[Full interactive dashboard → chess.adamissah.com](https://chess.adamissah.com)**
+
+All 6 models, 300 puzzles each (sorted by accuracy):
+
+| Model | Provider | Accuracy | Avg Score | Format Compliance | Avg Latency |
+|---|---|---|---|---|---|
+| **o3** | OpenAI | **71.3%** | 0.74 | 92% | 104s |
+| claude-opus-4-7 | Anthropic | 8.3% | 0.19 | 36% | 32s |
+| gpt-4.1 | OpenAI | 6.3% | 0.36 | 87% | 0.8s |
+| claude-sonnet-4-6 | Anthropic | 6.0% | 0.29 | 91% | 24s |
+| claude-haiku-4-5 | Anthropic | 1.7% | 0.18 | 45% | 8s |
+| gpt-4.1-mini | OpenAI | 1.7% | 0.27 | 84% | 1s |
+
+### Headline finding
+
+**o3 is in a different class: 71% vs. single digits for everyone else.** And it doesn't just score higher, it degrades *gracefully* with difficulty (mate-in-1 95% down to mate-in-5 50%; beginner 83% down to expert 56%) where every other model flatlines near 0% past mate-in-1. The reasoning models are doing actual lookahead; the rest are pattern-matching one-move mates.
+
+**The qualitative edge that the numbers don't show:** o3 has a failure mode the others don't. When it genuinely can't find a forced mate, it **says so** (`"I'm sorry, I can't solve this"`) instead of inventing a plausible-looking wrong line. Its misses are mostly explicit refusals or last-move near-misses, not confident hallucinations. That's better-calibrated, safer behavior, a real difference in *kind*, not just degree.
+
+### Per-model analysis
+
+- **o3 (OpenAI, reasoning):** 71% accuracy, 92% format compliance, but ~104s/puzzle. Genuine search, graceful difficulty curve, and the honest "I can't solve this" failure mode above. A different class of model at a real latency/cost premium.
+- **claude-opus-4-7 (Anthropic, flagship):** highest accuracy of the non-reasoning models (8.3%), yet **lowest** format compliance (36%) and most tokens (~1,775), so its composite score (0.19) sinks near the bottom. The clearest case of *capability undercut by output*: it finds mates but spills repeated/loose moves instead of a clean line, so the eval can't credit work it did.
+- **gpt-4.1 (OpenAI, mid):** best non-reasoning composite score (0.36) via efficiency: sub-second, ~25 output tokens, 87% format compliance. 25% on mate-in-1 tapering to ~0 by mate-in-3. Fast and clean, hard capability ceiling.
+- **claude-sonnet-4-6 (Anthropic, mid):** ties gpt-4.1 on accuracy (6%) with the highest format compliance short of o3 (91%). The most disciplined output among non-reasoning models, but the extra deliberation (~24s) buys format reliability, not more solutions.
+- **claude-haiku-4-5 (Anthropic, fast):** same accuracy as gpt-4.1-mini (1.7%) but ~8× slower with only 45% format compliance despite ~900 tokens. Reasons at length, rarely converges, and drifts out of clean UCI. The weakest cost/benefit in the field.
+- **gpt-4.1-mini (OpenAI, fast):** the capability floor. Cheapest and fastest (~1s, ~95 tokens), solves ~8% of mate-in-1s and almost nothing longer. Can pattern-match a one-move mate; no real lookahead.
 
 ## Project structure
 
