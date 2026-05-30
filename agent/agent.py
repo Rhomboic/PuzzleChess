@@ -113,7 +113,7 @@ def query_openai(client: OpenAI, model: str, fen: str, mate_type: str) -> dict:
     }
     # o3 and o1 use max_completion_tokens instead of max_tokens
     if model in O3_MODELS:
-        kwargs["max_completion_tokens"] = 4096
+        kwargs["max_completion_tokens"] = 16000  # o3 needs room for reasoning + answer
     else:
         kwargs["max_tokens"] = 4096
 
@@ -134,8 +134,6 @@ def query_openai(client: OpenAI, model: str, fen: str, mate_type: str) -> dict:
 
     msg = response.choices[0].message
     raw = msg.content or ""
-    print(f"\nDEBUG refusal: {repr(msg.refusal)}", flush=True)
-    print(f"\nDEBUG full response: {repr(response.model_dump())[:1000]}\n", flush=True)
     extracted = extract_uci_moves(raw)
     expected = int(mate_type.replace("mateIn", "")) * 2 - 1
     if len(extracted.split()) != expected:
