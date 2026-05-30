@@ -5,9 +5,9 @@ provider "aws" {
 }
 
 resource "aws_acm_certificate" "chess" {
-  provider                  = aws.us_east_1
-  domain_name               = "chess.adamissah.com"
-  validation_method         = "DNS"
+  provider          = aws.us_east_1
+  domain_name       = "chess.adamissah.com"
+  validation_method = "DNS"
 
   lifecycle {
     create_before_destroy = true

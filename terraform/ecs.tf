@@ -23,9 +23,9 @@ resource "aws_ecs_task_definition" "model" {
     image = "${aws_ecr_repository.puzzlechess.repository_url}:${each.key}"
 
     environment = [
-      { name = "MODEL",              value = each.key },
-      { name = "S3_BUCKET",          value = aws_s3_bucket.results.bucket },
-      { name = "S3_KEY_PREFIX",      value = "runs/" },
+      { name = "MODEL", value = each.key },
+      { name = "S3_BUCKET", value = aws_s3_bucket.results.bucket },
+      { name = "S3_KEY_PREFIX", value = "runs/" },
       { name = "AWS_DEFAULT_REGION", value = var.aws_region },
     ]
 

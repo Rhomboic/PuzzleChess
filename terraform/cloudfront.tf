@@ -2,7 +2,7 @@ resource "aws_cloudfront_distribution" "dashboard" {
   enabled             = true
   default_root_object = "index.html"
   aliases             = ["chess.adamissah.com"]
-  price_class         = "PriceClass_100"  # US/Europe only — cheapest
+  price_class         = "PriceClass_100" # US/Europe only — cheapest
 
   origin {
     domain_name = aws_s3_bucket_website_configuration.dashboard.website_endpoint
@@ -11,7 +11,7 @@ resource "aws_cloudfront_distribution" "dashboard" {
     custom_origin_config {
       http_port              = 80
       https_port             = 443
-      origin_protocol_policy = "http-only"  # S3 website endpoint is HTTP
+      origin_protocol_policy = "http-only" # S3 website endpoint is HTTP
       origin_ssl_protocols   = ["TLSv1.2"]
     }
   }
@@ -28,7 +28,7 @@ resource "aws_cloudfront_distribution" "dashboard" {
     }
 
     min_ttl     = 0
-    default_ttl = 300   # 5 min cache — dashboard updates when new results arrive
+    default_ttl = 300 # 5 min cache — dashboard updates when new results arrive
     max_ttl     = 3600
   }
 
