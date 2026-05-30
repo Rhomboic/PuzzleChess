@@ -218,9 +218,8 @@ function buildOverview(loadedModels) {
       <div class="card"><div class="card-title">Latency vs Accuracy</div><div class="card-desc">Speed vs correctness tradeoff — closer to top-left is better</div><div class="chart-wrap"><canvas id="chart-scatter"></canvas></div></div>
       <div class="card"><div class="card-title">Format Compliance Rate</div><div class="card-desc">% of puzzles where the model followed UCI output format instructions</div><div class="chart-wrap"><canvas id="chart-format"></canvas></div></div>
     </div>
-
     <div class="grid-2 section">
-      <div class="card"><div class="card-title">Valid Move Rate</div><div class="card-desc">% of predicted moves that are actually legal in the position (validated with python-chess)</div><div class="chart-wrap"><canvas id="chart-valid"></canvas></div></div>
+      <div class="card"><div class="card-title">Valid Move Rate</div><div class="card-desc">% of predicted moves that are actually legal in the position (checked with python-chess)</div><div class="chart-wrap"><canvas id="chart-valid"></canvas></div></div>
     </div>
 
     <div class="section card">
@@ -301,6 +300,12 @@ function buildOverview(loadedModels) {
     options: { responsive: true, plugins: { legend: { display: false } }, scales: { y: { min: 0, max: 100, ticks: { callback: v => v + '%' }, grid: { color: C_BORDER } }, x: { grid: { display: false } } } }
   });
 
+  new Chart(document.getElementById('chart-valid'), {
+    type: 'bar',
+    data: { labels, datasets: [{ label: 'Valid Move Rate', data: active.map(([,d]) => +((d.summary.avg_valid_ratio ?? 0) * 100).toFixed(1)), backgroundColor: colors.map(c => c + '33'), borderColor: colors, borderWidth: 2, borderRadius: 4 }] },
+    options: { responsive: true, plugins: { legend: { display: false } }, scales: { y: { min: 0, max: 100, ticks: { callback: v => v + '%' }, grid: { color: C_BORDER } }, x: { grid: { display: false } } } }
+  });
+
   // sort by total run time ascending
   const runtimeSorted = [...active].sort((a, b) =>
     a[1].puzzles.reduce((s, p) => s + p.latency_ms, 0) -
@@ -334,13 +339,14 @@ function buildOverview(loadedModels) {
 // ── Per-model panel ───────────────────────────────────────────────────────────
 
 function buildModelPanel(key, data) {
-  const meta = MODEL_META[key] || { label: key, provider: 'openai', tier: '' };
+  const meta = MODEL_META[key] || { label: key, provider: modelProvider(key), tier: '' };
   const s = data.summary;
   const color = modelColor(key);
-  const badgeStyle = meta.provider === 'claude'
+  const isClaude = modelProvider(key) === 'claude';
+  const badgeStyle = isClaude
     ? 'background:rgba(124,58,237,0.15);color:#7c3aed'
     : 'background:rgba(0,212,255,0.15);color:#00d4ff';
-  const provider = meta.provider === 'claude' ? 'Anthropic' : 'OpenAI';
+  const provider = isClaude ? 'Anthropic' : 'OpenAI';
   const sk = slug(key);
 
   // Score distribution
