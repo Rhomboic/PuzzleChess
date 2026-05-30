@@ -142,7 +142,7 @@ function totalRunTime(data) {
 function buildOverview(loadedModels) {
   const panel = document.getElementById('panel-overview');
   panel.innerHTML = `
-    <details class="section card methodology" open>
+    <details class="section card methodology">
       <summary>
         <span class="card-title" style="display:inline;cursor:pointer">Methodology</span>
         <span class="method-toggle">▸</span>
