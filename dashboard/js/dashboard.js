@@ -5,14 +5,56 @@ const S3_BASE  = IS_LOCAL
   ? 'results/'
   : 'https://puzzlechess-results-673981388599.s3.us-west-1.amazonaws.com/runs/';
 
-// Known models — label/provider/tier metadata only, no hardcoded results
+// Known models: label/provider/tier + a qualitative analysis write-up per model.
 const MODEL_META = {
-  'claude-haiku-4-5':  { label: 'Claude Haiku 4.5',  provider: 'claude', tier: 'Fast / Cheap' },
-  'claude-sonnet-4-6': { label: 'Claude Sonnet 4.6', provider: 'claude', tier: 'Mid' },
-  'claude-opus-4-7':   { label: 'Claude Opus 4.7',   provider: 'claude', tier: 'Flagship' },
-  'gpt-4.1-mini':      { label: 'GPT-4.1 Mini',      provider: 'openai', tier: 'Fast / Cheap' },
-  'gpt-4.1':           { label: 'GPT-4.1',            provider: 'openai', tier: 'Mid' },
-  'o3':                { label: 'o3',                  provider: 'openai', tier: 'Reasoning' },
+  'claude-haiku-4-5': {
+    label: 'Claude Haiku 4.5', provider: 'claude', tier: 'Fast / Cheap',
+    analysis: `
+      <div class="method-section"><h3>Profile</h3>
+      <p>Same accuracy as GPT-4.1 Mini (1.7%) but ~8× slower and far less disciplined: only <strong>45% format compliance</strong> despite burning ~900 output tokens per puzzle. Solves a few mate-in-1s and essentially nothing longer.</p></div>
+      <div class="method-section"><h3>What stands out</h3>
+      <p>It reasons at length but rarely converges, and it frequently drifts out of clean UCI into algebraic notation, prose, or the wrong number of moves, so even when the idea is reasonable, the answer is unusable. The weakest cost/benefit in the field: verbose without payoff.</p></div>`,
+  },
+  'claude-sonnet-4-6': {
+    label: 'Claude Sonnet 4.6', provider: 'claude', tier: 'Mid',
+    analysis: `
+      <div class="method-section"><h3>Profile</h3>
+      <p>Ties GPT-4.1 on accuracy (6%) with the highest format compliance of any model except o3 (<strong>91%</strong>). Slow (~24s) and verbose (~1,180 output tokens).</p></div>
+      <div class="method-section"><h3>What stands out</h3>
+      <p>The most <strong>disciplined output</strong> among the non-reasoning models: when it answers, it's clean UCI of the right length. But the extra deliberation buys format reliability, not more solutions. It lands the same accuracy as GPT-4.1 at ~30× the latency.</p></div>`,
+  },
+  'claude-opus-4-7': {
+    label: 'Claude Opus 4.7', provider: 'claude', tier: 'Flagship',
+    analysis: `
+      <div class="method-section"><h3>Profile</h3>
+      <p>Highest accuracy of the five non-reasoning models (<strong>8.3%</strong>), yet the <strong>lowest format compliance (36%)</strong> and the highest token use (~1,775), which drags its composite score (0.19) to near the bottom.</p></div>
+      <div class="method-section"><h3>What stands out</h3>
+      <p>The clearest case of <strong>capability undercut by output</strong>. It finds more mates than any other non-reasoning model, but routinely spills repeated or loose moves instead of a single clean line, so the eval can't credit work it actually did. A sharp illustration that raw ability does not equal usable output.</p></div>`,
+  },
+  'gpt-4.1-mini': {
+    label: 'GPT-4.1 Mini', provider: 'openai', tier: 'Fast / Cheap',
+    analysis: `
+      <div class="method-section"><h3>Profile</h3>
+      <p>The cheapest, fastest model (~1s, ~95 output tokens). Solves only the simplest puzzles (~8% of mate-in-1s, essentially 0% beyond) with solid format compliance (84%).</p></div>
+      <div class="method-section"><h3>What stands out</h3>
+      <p>The capability <strong>floor</strong>: fast and well-behaved, but no real multi-move search. It can occasionally pattern-match a one-move mate; anything requiring lookahead collapses.</p></div>`,
+  },
+  'gpt-4.1': {
+    label: 'GPT-4.1', provider: 'openai', tier: 'Mid',
+    analysis: `
+      <div class="method-section"><h3>Profile</h3>
+      <p>Best of the non-reasoning models on composite score (0.36), driven by speed and format discipline: sub-second responses, just ~25 output tokens, 87% format compliance. 25% on mate-in-1, tapering to ~0 by mate-in-3.</p></div>
+      <div class="method-section"><h3>What stands out</h3>
+      <p>The most <strong>efficient</strong> model in the field: terse, fast, clean. But efficiency is the whole story. It answers quickly and correctly formats, it just can't search deep. Excellent cost/latency, hard capability ceiling.</p></div>`,
+  },
+  'o3': {
+    label: 'o3', provider: 'openai', tier: 'Reasoning',
+    analysis: `
+      <div class="method-section"><h3>Profile</h3>
+      <p>A different class entirely: <strong>71% accuracy</strong> vs. single digits for every other model, with 92% format compliance. It degrades <em>gracefully</em> along difficulty (mate-in-1 95% down to mate-in-5 50%; beginner 83% down to expert 56%) where the others flatline near 0%. The cost is latency (~104s per puzzle) and price.</p></div>
+      <div class="method-section"><h3>What stands out: it knows when it's stuck</h3>
+      <p>o3 has a failure mode the others don't: when it genuinely can't find a forced mate, it <strong>says so</strong> ("I'm sorry, I can't solve this") instead of inventing a plausible-looking wrong line. Its misses are mostly explicit refusals or last-move near-misses, not confident hallucinations. That calibration is a real qualitative edge the accuracy number alone doesn't capture: a more honest, safer behavior.</p></div>`,
+  },
 };
 
 const TIERS      = ['beginner', 'intermediate', 'advanced', 'expert'];
@@ -297,6 +339,13 @@ function buildModelPanel(key, data) {
       <div class="stat-card"><div class="stat-label">Format Compliance</div><div class="stat-value" style="color:${color}">${pct(s.format_compliance_rate ?? 0)}</div><div class="stat-sub">followed UCI instructions</div></div>
       <div class="stat-card"><div class="stat-label">Avg Latency</div><div class="stat-value muted">${ms(s.avg_latency_ms)}</div><div class="stat-sub">per puzzle</div></div>
     </div>
+    ${meta.analysis ? `<details class="section card methodology" open>
+      <summary>
+        <span class="card-title" style="display:inline;cursor:pointer">Analysis</span>
+        <span class="method-toggle">▸</span>
+      </summary>
+      <div class="method-body">${meta.analysis}</div>
+    </details>` : ''}
     <div class="grid-2 section">
       <div class="card"><div class="card-title">Accuracy by Difficulty Tier</div><div class="card-desc">Does the model degrade on harder puzzles?</div><div class="chart-wrap"><canvas id="chart-${sk}-tier"></canvas></div></div>
       <div class="card"><div class="card-title">Accuracy by Mate Type</div><div class="card-desc">Does sequence length affect performance?</div><div class="chart-wrap"><canvas id="chart-${sk}-mate"></canvas></div></div>
