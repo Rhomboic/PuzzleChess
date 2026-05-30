@@ -355,13 +355,16 @@ function buildModelPanel(key, data) {
       <div class="stat-card"><div class="stat-label">Format Compliance</div><div class="stat-value" style="color:${color}">${pct(s.format_compliance_rate ?? 0)}</div><div class="stat-sub">followed UCI instructions</div></div>
       <div class="stat-card"><div class="stat-label">Avg Latency</div><div class="stat-value muted">${ms(s.avg_latency_ms)}</div><div class="stat-sub">per puzzle</div></div>
     </div>
-    ${meta.analysis ? `<details class="section card methodology" open>
+    <details class="section card methodology" open>
       <summary>
         <span class="card-title" style="display:inline;cursor:pointer">Analysis</span>
         <span class="method-toggle">▸</span>
       </summary>
-      <div class="method-body">${meta.analysis}</div>
-    </details>` : ''}
+      <div class="method-body">${meta.analysis || `
+        <div class="method-section">
+          <p style="color:var(--text-muted)">A written analysis for <strong>${meta.label || key}</strong> hasn't been added yet. The metrics and charts below reflect its full benchmark run.</p>
+        </div>`}</div>
+    </details>
     <div class="grid-2 section">
       <div class="card"><div class="card-title">Accuracy by Difficulty Tier</div><div class="card-desc">Does the model degrade on harder puzzles?</div><div class="chart-wrap"><canvas id="chart-${sk}-tier"></canvas></div></div>
       <div class="card"><div class="card-title">Accuracy by Mate Type</div><div class="card-desc">Does sequence length affect performance?</div><div class="chart-wrap"><canvas id="chart-${sk}-mate"></canvas></div></div>
