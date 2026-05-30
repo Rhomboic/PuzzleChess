@@ -100,18 +100,42 @@ def query_claude(client: anthropic.Anthropic, model: str, fen: str, mate_type: s
 
 # ── OpenAI agent ──────────────────────────────────────────────────────────────
 
+O3_MODELS = {"o3", "o1", "o1-mini", "o3-mini"}  # models using max_completion_tokens
+
 def query_openai(client: OpenAI, model: str, fen: str, mate_type: str) -> dict:
-    start = time.time()
-    response = client.chat.completions.create(
-        model=model,
-        max_tokens=4096,
-        messages=[
+    import random
+    kwargs = {
+        "model": model,
+        "messages": [
             {"role": "system", "content": SYSTEM_PROMPT},
             {"role": "user",   "content": build_user_prompt(fen, mate_type)},
         ],
-    )
-    latency_ms = int((time.time() - start) * 1000)
-    raw = response.choices[0].message.content
+    }
+    # o3 and o1 use max_completion_tokens instead of max_tokens
+    if model in O3_MODELS:
+        kwargs["max_completion_tokens"] = 4096
+    else:
+        kwargs["max_tokens"] = 4096
+
+    # retry with backoff for rate limits
+    for attempt in range(5):
+        try:
+            start = time.time()
+            response = client.chat.completions.create(**kwargs)
+            latency_ms = int((time.time() - start) * 1000)
+            break
+        except Exception as e:
+            if "429" in str(e) and attempt < 4:
+                wait = 2 ** attempt + random.uniform(0, 1)
+                print(f" [rate limit, retrying in {wait:.1f}s]", flush=True)
+                time.sleep(wait)
+            else:
+                raise
+
+    msg = response.choices[0].message
+    raw = msg.content or ""
+    print(f"\nDEBUG refusal: {repr(msg.refusal)}", flush=True)
+    print(f"\nDEBUG full response: {repr(response.model_dump())[:1000]}\n", flush=True)
     extracted = extract_uci_moves(raw)
     expected = int(mate_type.replace("mateIn", "")) * 2 - 1
     if len(extracted.split()) != expected:
@@ -165,7 +189,7 @@ def run_agent(puzzles: list, model: str) -> list:
             print(f"-> {response['predicted_moves']} ({response['latency_ms']}ms)")
         except Exception as e:
             response = {"predicted_moves": "", "latency_ms": 0, "input_tokens": 0, "output_tokens": 0}
-            print(f"ERROR: {e}")
+            print(f"ERROR: {type(e).__name__}: {e}")
 
         results.append({
             "PuzzleId":        puzzle_id,
