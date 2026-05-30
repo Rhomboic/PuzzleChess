@@ -241,7 +241,9 @@ function buildOverview(loadedModels) {
     </tr>`;
   });
 
-  const active = Object.entries(loadedModels);
+  // Sort by accuracy descending so bar order is stable across loads
+  const active = Object.entries(loadedModels)
+    .sort((a, b) => b[1].summary.overall_accuracy - a[1].summary.overall_accuracy);
   if (active.length === 0) return;
 
   const labels = active.map(([k]) => MODEL_META[k]?.label || k);
