@@ -89,9 +89,12 @@ function switchTab(tabKey) {
 
 function totalRunTime(data) {
   const ms = data.puzzles.reduce((sum, p) => sum + p.latency_ms, 0);
-  if (ms >= 3600000) return (ms / 3600000).toFixed(1) + 'h';
-  if (ms >= 60000)   return (ms / 60000).toFixed(1) + 'm';
-  return (ms / 1000).toFixed(0) + 's';
+  const h  = Math.floor(ms / 3600000);
+  const m  = Math.floor((ms % 3600000) / 60000);
+  const s  = Math.floor((ms % 60000) / 1000);
+  if (h > 0) return `${h}h ${m}m ${s}s`;
+  if (m > 0) return `${m}m ${s}s`;
+  return `${s}s`;
 }
 
 function buildOverview(loadedModels) {
@@ -248,7 +251,7 @@ function buildOverview(loadedModels) {
       labels: runtimeSorted.map(([k]) => MODEL_META[k]?.label || k),
       datasets: [{
         label: 'Total Run Time (min)',
-        data: runtimeSorted.map(([,d]) => +(d.puzzles.reduce((s, p) => s + p.latency_ms, 0) / 60000).toFixed(1)),
+        data: runtimeSorted.map(([,d]) => +(d.puzzles.reduce((s, p) => s + p.latency_ms, 0) / 60000).toFixed(2)),
         backgroundColor: runtimeSorted.map(([k]) => modelColor(k) + '33'),
         borderColor: runtimeSorted.map(([k]) => modelColor(k)),
         borderWidth: 2,
