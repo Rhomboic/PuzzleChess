@@ -69,21 +69,26 @@ Chart.defaults.color = C_TEXT;
 Chart.defaults.borderColor = C_BORDER;
 Chart.defaults.font.family = 'Inter';
 
-// Bars grow from the baseline (not from the top-left corner) with a subtle
-// left-to-right stagger. Vertical bars rise from the bottom; horizontal bars
-// extend from the left. Scatter points just fade in.
-Chart.defaults.animation = { duration: 700, easing: 'easeOutQuart' };
-Chart.defaults.animations = {
-  y: {
-    from: (ctx) => (ctx.chart.scales.y ? ctx.chart.scales.y.getPixelForValue(0) : undefined),
-  },
-  x: {
-    from: (ctx) => (ctx.chart.scales.x ? ctx.chart.scales.x.getPixelForValue(0) : undefined),
+// Per-bar left-to-right stagger delay (shared by all bar charts).
+const barDelay = (ctx) => (ctx.type === 'data' && ctx.mode === 'default' ? ctx.dataIndex * 80 : 0);
+
+// Vertical bars: freeze the category (x) axis so bars don't slide in from the
+// corner, and grow each bar's height up from the baseline.
+const growUp = {
+  animation: { duration: 700, easing: 'easeOutQuart', delay: barDelay },
+  animations: {
+    x: { duration: 0 },
+    y: { from: (ctx) => (ctx.chart.scales.y ? ctx.chart.scales.y.getPixelForValue(0) : 0) },
   },
 };
-// Per-bar left-to-right stagger via delay.
-Chart.defaults.datasets.bar.animation = {
-  delay: (ctx) => (ctx.type === 'data' && ctx.mode === 'default' ? ctx.dataIndex * 80 : 0),
+
+// Horizontal bars: freeze the category (y) axis and grow each bar's width from the left.
+const growRight = {
+  animation: { duration: 700, easing: 'easeOutQuart', delay: barDelay },
+  animations: {
+    y: { duration: 0 },
+    x: { from: (ctx) => (ctx.chart.scales.x ? ctx.chart.scales.x.getPixelForValue(0) : 0) },
+  },
 };
 
 function modelColor(key) {
@@ -375,6 +380,7 @@ function buildModelPanel(key, data) {
   const barOpts = (horizontal) => ({
     type: 'bar',
     options: {
+      ...(horizontal ? growRight : growUp),
       indexAxis: horizontal ? 'y' : 'x',
       responsive: true,
       plugins: { legend: { display: false } },
