@@ -1,0 +1,40 @@
+name: Deploy Dashboard
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'dashboard/**'
+
+permissions:
+  id-token: write   # required for OIDC
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          aws-region: us-west-1
+
+      - name: Sync dashboard to S3
+        run: |
+          aws s3 sync dashboard/ s3://puzzlechess-dashboard-673981388599/ \
+            --delete \
+            --exclude "results/*" \
+            --cache-control "max-age=300"
+
+      - name: Invalidate CloudFront cache
+        run: |
+          CF_ID=$(aws cloudfront list-distributions \
+            --query "DistributionList.Items[?Aliases.Items[?contains(@,'chess.adamissah.com')]].Id" \
+            --output text)
+          aws cloudfront create-invalidation \
+            --distribution-id $CF_ID \
+            --paths "/*"

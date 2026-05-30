@@ -1,8 +1,8 @@
 // ── Config ────────────────────────────────────────────────────────────────────
 
-const IS_LOCAL = location.hostname === 'localhost' || location.hostname === '127.0.0.1';
+const IS_LOCAL = ['localhost', '127.0.0.1', '::1', '[::]'].includes(location.hostname) || location.hostname === '';
 const S3_BASE  = IS_LOCAL
-  ? '../results/'
+  ? 'results/'
   : 'https://puzzlechess-results-673981388599.s3.us-west-1.amazonaws.com/runs/';
 
 // Known models — label/provider/tier metadata only, no hardcoded results
@@ -87,6 +87,13 @@ function switchTab(tabKey) {
 
 // ── Overview charts ───────────────────────────────────────────────────────────
 
+function totalRunTime(data) {
+  const ms = data.puzzles.reduce((sum, p) => sum + p.latency_ms, 0);
+  if (ms >= 3600000) return (ms / 3600000).toFixed(1) + 'h';
+  if (ms >= 60000)   return (ms / 60000).toFixed(1) + 'm';
+  return (ms / 1000).toFixed(0) + 's';
+}
+
 function buildOverview(loadedModels) {
   const panel = document.getElementById('panel-overview');
   panel.innerHTML = `
@@ -96,20 +103,75 @@ function buildOverview(loadedModels) {
         <table>
           <thead><tr>
             <th>Model</th><th>Accuracy</th><th>Avg Score</th>
-            <th>Valid Ratio</th><th>Format Compliance</th><th>Avg Latency</th><th>Output Tokens</th>
+            <th>Valid Ratio</th><th>Format Compliance</th><th>Avg Latency</th><th>Output Tokens</th><th>Total Run Time</th>
           </tr></thead>
           <tbody id="overview-tbody"></tbody>
         </table>
       </div>
     </div>
     <div class="grid-2 section">
-      <div class="card"><div class="card-title">Accuracy by Model</div><div class="chart-wrap"><canvas id="chart-accuracy"></canvas></div></div>
-      <div class="card"><div class="card-title">Avg Score by Model</div><div class="chart-wrap"><canvas id="chart-score"></canvas></div></div>
+      <div class="card"><div class="card-title">Accuracy by Model</div><div class="card-desc">% of puzzles where the model found the exact correct mating sequence</div><div class="chart-wrap"><canvas id="chart-accuracy"></canvas></div></div>
+      <div class="card"><div class="card-title">Avg Score by Model</div><div class="card-desc">Weighted composite: 0.45× correct + 0.35× valid ratio + 0.10× latency + 0.10× format</div><div class="chart-wrap"><canvas id="chart-score"></canvas></div></div>
     </div>
     <div class="grid-2 section">
-      <div class="card"><div class="card-title">Latency vs Accuracy</div><div class="chart-wrap"><canvas id="chart-scatter"></canvas></div></div>
-      <div class="card"><div class="card-title">Format Compliance Rate</div><div class="chart-wrap"><canvas id="chart-format"></canvas></div></div>
+      <div class="card"><div class="card-title">Latency vs Accuracy</div><div class="card-desc">Speed vs correctness tradeoff — closer to top-left is better</div><div class="chart-wrap"><canvas id="chart-scatter"></canvas></div></div>
+      <div class="card"><div class="card-title">Format Compliance Rate</div><div class="card-desc">% of puzzles where the model followed UCI output format instructions</div><div class="chart-wrap"><canvas id="chart-format"></canvas></div></div>
     </div>
+
+    <div class="section card">
+      <div class="card-title">Total Benchmark Run Time (300 puzzles)</div>
+      <div class="card-desc">Total wall-clock API time to complete the full benchmark — sum of all 300 puzzle latencies</div>
+      <div class="chart-wrap"><canvas id="chart-runtime"></canvas></div>
+    </div>
+
+    <details class="section card methodology">
+      <summary>
+        <span class="card-title" style="display:inline;cursor:pointer">Methodology</span>
+        <span class="method-toggle">▸</span>
+      </summary>
+      <div class="method-body">
+
+        <div class="method-section">
+          <h3>Dataset</h3>
+          <p>300 puzzles sampled from the <a href="https://database.lichess.org/#puzzles" target="_blank">Lichess open puzzle database</a> (~6M puzzles). Filtered for checkmate puzzles only, evenly distributed across <strong>5 mate types</strong> (mateIn1–mateIn5) × <strong>4 difficulty tiers</strong> (15 puzzles each = 300 total).</p>
+          <div class="method-grid">
+            <div class="method-item"><span class="method-label">Beginner</span><span class="method-val">&lt; 1200 Elo</span></div>
+            <div class="method-item"><span class="method-label">Intermediate</span><span class="method-val">1200–1600 Elo</span></div>
+            <div class="method-item"><span class="method-label">Advanced</span><span class="method-val">1600–2000 Elo</span></div>
+            <div class="method-item"><span class="method-label">Expert</span><span class="method-val">2000+ Elo</span></div>
+          </div>
+        </div>
+
+        <div class="method-section">
+          <h3>Puzzle Format</h3>
+          <p>Each puzzle is presented as a FEN board position with the opponent's setup move already applied. The model must output the full mating sequence in <strong>UCI notation</strong> (e.g. <code>e2e4 d7d5 f1b5</code>), including both its own moves and the opponent's forced responses.</p>
+        </div>
+
+        <div class="method-section">
+          <h3>Eval Metrics</h3>
+          <div class="method-grid">
+            <div class="method-item"><span class="method-label">Accuracy</span><span class="method-val">Exact match of full move sequence (binary)</span></div>
+            <div class="method-item"><span class="method-label">Valid Ratio</span><span class="method-val">% of predicted moves that are legal chess moves</span></div>
+            <div class="method-item"><span class="method-label">Format Compliance</span><span class="method-val">Model returned the expected number of UCI moves</span></div>
+            <div class="method-item"><span class="method-label">Latency</span><span class="method-val">Wall clock time of the API call</span></div>
+          </div>
+        </div>
+
+        <div class="method-section">
+          <h3>Composite Score Formula</h3>
+          <div class="formula">
+            score = 0.45 × correct + 0.35 × valid_ratio + 0.10 × (1 − norm_latency) + 0.10 × format_followed
+          </div>
+          <p style="margin-top:10px;font-size:12px;color:var(--text-muted)">Correctness is the dominant signal. Valid ratio gives partial credit for legal but incorrect sequences. Latency is normalized against a 30s cap. Format compliance rewards models that follow output instructions.</p>
+        </div>
+
+        <div class="method-section">
+          <h3>Infrastructure</h3>
+          <p>Each model runs in its own Docker container on <strong>AWS ECS Fargate</strong> — all 6 in parallel. Results are written to S3 as JSON. API keys are stored in <strong>AWS Secrets Manager</strong> and injected at runtime. Infrastructure provisioned via <strong>Terraform</strong>.</p>
+        </div>
+
+      </div>
+    </details>
   `;
 
   const tbody = document.getElementById('overview-tbody');
@@ -130,6 +192,7 @@ function buildOverview(loadedModels) {
       <td>${s ? pct(s.format_compliance_rate ?? 0) : '—'}</td>
       <td>${s ? ms(s.avg_latency_ms) : '—'}</td>
       <td>${s ? Math.round(s.avg_output_tokens) : '—'}</td>
+      <td>${data ? totalRunTime(data) : '—'}</td>
     </tr>`;
   });
 
@@ -172,6 +235,35 @@ function buildOverview(loadedModels) {
     data: { labels, datasets: [{ label: 'Format Compliance', data: active.map(([,d]) => +((d.summary.format_compliance_rate ?? 0) * 100).toFixed(1)), backgroundColor: colors.map(c => c + '33'), borderColor: colors, borderWidth: 2, borderRadius: 4 }] },
     options: { responsive: true, plugins: { legend: { display: false } }, scales: { y: { min: 0, max: 100, ticks: { callback: v => v + '%' }, grid: { color: C_BORDER } }, x: { grid: { display: false } } } }
   });
+
+  // sort by total run time ascending
+  const runtimeSorted = [...active].sort((a, b) =>
+    a[1].puzzles.reduce((s, p) => s + p.latency_ms, 0) -
+    b[1].puzzles.reduce((s, p) => s + p.latency_ms, 0)
+  );
+
+  new Chart(document.getElementById('chart-runtime'), {
+    type: 'bar',
+    data: {
+      labels: runtimeSorted.map(([k]) => MODEL_META[k]?.label || k),
+      datasets: [{
+        label: 'Total Run Time (min)',
+        data: runtimeSorted.map(([,d]) => +(d.puzzles.reduce((s, p) => s + p.latency_ms, 0) / 60000).toFixed(1)),
+        backgroundColor: runtimeSorted.map(([k]) => modelColor(k) + '33'),
+        borderColor: runtimeSorted.map(([k]) => modelColor(k)),
+        borderWidth: 2,
+        borderRadius: 4,
+      }]
+    },
+    options: {
+      responsive: true,
+      plugins: { legend: { display: false } },
+      scales: {
+        y: { ticks: { callback: v => v + 'm' }, grid: { color: C_BORDER } },
+        x: { grid: { display: false } }
+      }
+    }
+  });
 }
 
 // ── Per-model panel ───────────────────────────────────────────────────────────
@@ -203,10 +295,10 @@ function buildModelPanel(key, data) {
       <div class="stat-card"><div class="stat-label">Avg Latency</div><div class="stat-value muted">${ms(s.avg_latency_ms)}</div><div class="stat-sub">per puzzle</div></div>
     </div>
     <div class="grid-2 section">
-      <div class="card"><div class="card-title">Accuracy by Difficulty Tier</div><div class="chart-wrap"><canvas id="chart-${sk}-tier"></canvas></div></div>
-      <div class="card"><div class="card-title">Accuracy by Mate Type</div><div class="chart-wrap"><canvas id="chart-${sk}-mate"></canvas></div></div>
+      <div class="card"><div class="card-title">Accuracy by Difficulty Tier</div><div class="card-desc">Does the model degrade on harder puzzles?</div><div class="chart-wrap"><canvas id="chart-${sk}-tier"></canvas></div></div>
+      <div class="card"><div class="card-title">Accuracy by Mate Type</div><div class="card-desc">Does sequence length affect performance?</div><div class="chart-wrap"><canvas id="chart-${sk}-mate"></canvas></div></div>
     </div>
-    <div class="section card"><div class="card-title">Score Distribution (300 puzzles)</div><div class="chart-wrap"><canvas id="chart-${sk}-dist"></canvas></div></div>
+    <div class="section card"><div class="card-title">Score Distribution (300 puzzles)</div><div class="card-desc">Spread of composite scores across all puzzles — right-skewed = more correct answers</div><div class="chart-wrap"><canvas id="chart-${sk}-dist"></canvas></div></div>
   `;
 
   const barOpts = (horizontal) => ({

@@ -92,7 +92,13 @@ body {
   color: var(--text-muted);
   text-transform: uppercase;
   letter-spacing: 0.5px;
+  margin-bottom: 4px;
+}
+.card-desc {
+  font-size: 12px;
+  color: var(--text-dim);
   margin-bottom: 16px;
+  line-height: 1.4;
 }
 
 /* ── Stat cards ── */
@@ -171,6 +177,128 @@ tbody td { padding: 12px 16px; }
 
 /* ── Section spacing ── */
 .section { margin-bottom: 24px; }
+
+/* ── Methodology ── */
+.methodology {
+  border-color: var(--border);
+}
+.methodology summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  cursor: pointer;
+  list-style: none;
+  user-select: none;
+  padding-bottom: 0;
+}
+.methodology[open] summary {
+  padding-bottom: 0;
+}
+.methodology summary::-webkit-details-marker { display: none; }
+.method-toggle {
+  color: var(--text-dim);
+  font-size: 11px;
+  transition: transform 0.2s;
+  margin-left: 8px;
+}
+.methodology[open] .method-toggle { transform: rotate(90deg); }
+
+.method-body {
+  margin-top: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+  border-top: 1px solid var(--border);
+  padding-top: 24px;
+}
+
+.method-section h3 {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 10px;
+}
+.method-section p {
+  font-size: 13px;
+  color: var(--text-muted);
+  line-height: 1.7;
+}
+.method-section p strong { color: var(--text); font-weight: 600; }
+.method-section a { color: var(--accent); text-decoration: none; }
+.method-section a:hover { text-decoration: underline; }
+.method-section code {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 1px 6px;
+  font-size: 11px;
+  color: var(--accent);
+  font-family: 'SF Mono', 'Fira Code', monospace;
+}
+
+.method-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 8px;
+  margin-top: 10px;
+}
+.method-item {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 12px 14px;
+}
+.method-label {
+  display: block;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--accent);
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  margin-bottom: 4px;
+}
+.method-val {
+  display: block;
+  font-size: 12px;
+  color: var(--text-muted);
+  line-height: 1.5;
+}
+
+.formula {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-left: 2px solid var(--accent);
+  border-radius: var(--radius);
+  padding: 14px 18px;
+  font-family: 'SF Mono', 'Fira Code', monospace;
+  font-size: 12px;
+  color: var(--text);
+  margin-top: 10px;
+  line-height: 1.6;
+  overflow-x: auto;
+}
+
+/* ── Footer ── */
+footer {
+  margin-top: 80px;
+  border-top: 1px solid var(--border);
+  padding: 20px 0;
+}
+.footer-inner {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 12px;
+  color: var(--text-dim);
+}
+.footer-right a {
+  color: var(--text-muted);
+  text-decoration: none;
+  transition: color 0.15s;
+}
+.footer-right a:hover { color: var(--accent); }
 
 /* ── Pending overlay ── */
 .pending-card {
