@@ -210,16 +210,18 @@ function buildOverview(loadedModels) {
         </table>
       </div>
     </div>
+    <div class="section card">
+      <div class="card-title">Accuracy by Model</div>
+      <div class="card-desc">% of puzzles where the model found the exact correct mating sequence</div>
+      <div class="chart-wrap"><canvas id="chart-accuracy"></canvas></div>
+    </div>
     <div class="grid-2 section">
-      <div class="card"><div class="card-title">Accuracy by Model</div><div class="card-desc">% of puzzles where the model found the exact correct mating sequence</div><div class="chart-wrap"><canvas id="chart-accuracy"></canvas></div></div>
       <div class="card"><div class="card-title">Avg Score by Model</div><div class="card-desc">Weighted composite: 0.45× correct + 0.35× valid ratio + 0.10× latency + 0.10× format</div><div class="chart-wrap"><canvas id="chart-score"></canvas></div></div>
+      <div class="card"><div class="card-title">Valid Move Rate</div><div class="card-desc">% of predicted moves that are actually legal in the position (checked with python-chess)</div><div class="chart-wrap"><canvas id="chart-valid"></canvas></div></div>
     </div>
     <div class="grid-2 section">
       <div class="card"><div class="card-title">Latency vs Accuracy</div><div class="card-desc">Speed vs correctness tradeoff — closer to top-left is better</div><div class="chart-wrap"><canvas id="chart-scatter"></canvas></div></div>
       <div class="card"><div class="card-title">Format Compliance Rate</div><div class="card-desc">% of puzzles where the model followed UCI output format instructions</div><div class="chart-wrap"><canvas id="chart-format"></canvas></div></div>
-    </div>
-    <div class="grid-2 section">
-      <div class="card"><div class="card-title">Valid Move Rate</div><div class="card-desc">% of predicted moves that are actually legal in the position (checked with python-chess)</div><div class="chart-wrap"><canvas id="chart-valid"></canvas></div></div>
     </div>
 
     <div class="section card">
