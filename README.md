@@ -4,45 +4,90 @@ An LLM agent benchmark that evaluates how well AI models solve chess puzzles. Ru
 
 ## What it does
 
-1. Loads filtered chess puzzles from a Lichess dataset (`data/`)
-2. Sends each puzzle to an LLM agent (`agent/`) which outputs the best move in UCI notation
+1. Loads 300 filtered chess puzzles from a Lichess dataset (`data/`)
+2. Sends each puzzle to an LLM agent (`agent/`) which outputs the correct move sequence in UCI notation
 3. Scores the agent's answers against the correct solutions (`eval/`)
 4. Writes results to S3 and exits
+
+## Models tested
+
+| Model | Provider | Tier |
+|---|---|---|
+| claude-haiku-4-5-20251001 | Anthropic | Fast / cheap |
+| claude-sonnet-4-6 | Anthropic | Mid |
+| claude-opus-4-7 | Anthropic | Flagship |
+| gpt-4.1-mini | OpenAI | Fast / cheap |
+| gpt-4.1 | OpenAI | Mid |
+| o3 | OpenAI | Reasoning |
+
+## Results
+
+> ⚠️ TODO: Update this table once all 6 model runs complete (expected: May 31, 2026)
+
+| Model | Accuracy | Format Compliance | Avg Latency | Avg Score |
+|---|---|---|---|---|
+| claude-haiku-4-5 | 1.7% | — | 8,330ms | 0.1759 |
+| claude-sonnet-4-6 | — | — | — | — |
+| claude-opus-4-7 | — | — | — | — |
+| gpt-4.1-mini | 1.7% | — | 1,420ms | 0.2704 |
+| gpt-4.1 | 6.3% | 86.3% | 751ms | 0.3552 |
+| o3 | — | — | — | — |
 
 ## Project structure
 
 ```
 PuzzleChess/
-├── data/           # Filtered puzzle CSV (not committed)
-├── agent/          # LLM agent loop (Claude / OpenAI)
-├── eval/           # Scoring logic
-├── results/        # Eval output, written to S3 before exit
-├── main.py         # Entry point — orchestrates the full run
-├── requirements.txt
-└── .env            # API keys — never committed, injected at runtime
+├── data/
+│   ├── filter_puzzles.py   # Filters Lichess CSV → 300 puzzles across 5 mate types × 4 tiers
+│   ├── load_puzzles.py     # Loads puzzles into dicts for the agent
+│   └── puzzles_filtered.csv
+├── agent/
+│   └── agent.py            # LLM agent loop (Claude + OpenAI, all 6 models)
+├── eval/
+│   └── eval.py             # Scoring: correctness, move validity, format compliance, latency
+├── terraform/              # AWS infra as code (ECR, ECS, S3, IAM, Secrets Manager)
+├── results/                # Eval output JSON, written to S3 before container exits
+├── main.py                 # Entry point — orchestrates the full run
+├── Dockerfile              # One image per model (MODEL baked in via ARG)
+├── push_images.sh          # Build and push all 6 images to ECR
+└── run_fargate.sh          # Launch all 6 ECS tasks in parallel
 ```
 
-## Models tested
+## Eval metrics
 
-- Claude Sonnet 4.6
-- Claude Haiku 4.5
-- GPT-4o
-- GPT-4o mini
-- o1-mini
-- o3-mini
+Each puzzle is scored on:
+- **Correctness** — exact match of full move sequence (0 or 1)
+- **Move validity** — per-move legality checked via `python-chess`
+- **Output format followed** — did the model return the expected number of UCI moves?
+- **Latency** — wall clock of the API call
+
+**Score formula:**
+```
+score = 0.45 * correct
+      + 0.35 * valid_ratio
+      + 0.10 * (1 - normalized_latency)
+      + 0.10 * output_format_followed
+```
 
 ## Running locally
 
 ```bash
 pip install -r requirements.txt
-cp .env.example .env  # add your API keys
+cp .env.example .env  # add your API keys and MODEL name
 python main.py
 ```
 
 ## Deployment
 
-The repo is built into a Docker image and run as an ECS Fargate task. API keys are passed in as environment variables at runtime — never baked into the image.
+Each model runs in its own Docker container on AWS ECS Fargate. API keys are stored in AWS Secrets Manager and injected at container startup — never baked into the image.
 
 ```
-Build image → push to ECR → RunTask on ECS → results written to S3 → container exits
+terraform apply          # provision ECR, ECS, S3, IAM, Secrets Manager
+./push_images.sh         # build linux/amd64 images and push to ECR
+./run_fargate.sh         # launch all 6 tasks in parallel
+```
+
+Results appear in S3 as each container finishes:
+```
+s3://puzzlechess-results-{account_id}/runs/{model}_results.json
 ```

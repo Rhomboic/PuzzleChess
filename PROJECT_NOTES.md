@@ -146,7 +146,9 @@ Reasoning models (Claude Sonnet, o3) think out loud before answering. Without a 
 
 ---
 
-## Results So Far (partial — Claude models still running)
+## Results So Far (partial — sonnet, opus, o3 still running)
+
+> ⚠️ TODO: Update this table tomorrow once all 6 model runs complete. Also update accuracy_by_tier and accuracy_by_mate_type breakdowns and write the full analysis section.
 
 | Model | Accuracy | Format Compliance | Avg Latency |
 |---|---|---|---|
