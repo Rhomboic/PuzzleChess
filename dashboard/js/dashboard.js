@@ -69,8 +69,15 @@ Chart.defaults.color = C_TEXT;
 Chart.defaults.borderColor = C_BORDER;
 Chart.defaults.font.family = 'Inter';
 
+// Infer provider for models not in MODEL_META (e.g. a newly-run model) from the
+// name, so the table/charts still color and label them correctly.
+function modelProvider(key) {
+  if (MODEL_META[key]) return MODEL_META[key].provider;
+  return /claude/i.test(key) ? 'claude' : 'openai';
+}
+
 function modelColor(key) {
-  return (MODEL_META[key] || {}).provider === 'claude' ? C_PURPLE : C_ACCENT;
+  return modelProvider(key) === 'claude' ? C_PURPLE : C_ACCENT;
 }
 
 function pct(v)  { return (v * 100).toFixed(1) + '%'; }
@@ -221,9 +228,16 @@ function buildOverview(loadedModels) {
 
   const tbody = document.getElementById('overview-tbody');
 
-  // All known models in defined order
-  Object.keys(MODEL_META).forEach(key => {
-    const meta = MODEL_META[key];
+  // Union of known models (for pending rows) and any model present in the
+  // manifest/results, so newly-added models show up without a code change.
+  // Loaded models first, sorted by accuracy; then any known-but-pending models.
+  const loadedKeys = Object.keys(loadedModels)
+    .sort((a, b) => loadedModels[b].summary.overall_accuracy - loadedModels[a].summary.overall_accuracy);
+  const pendingKeys = Object.keys(MODEL_META).filter(k => !loadedModels[k]);
+  const tableKeys = [...loadedKeys, ...pendingKeys];
+
+  tableKeys.forEach(key => {
+    const meta = MODEL_META[key] || { label: key, provider: modelProvider(key) };
     const data = loadedModels[key];
     const s = data?.summary;
     const badgeClass = meta.provider === 'claude' ? 'badge-claude' : 'badge-openai';
