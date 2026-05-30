@@ -4,6 +4,9 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>ChessPuzzle Benchmark</title>
+  <link rel="icon" type="image/png" sizes="32x32" href="assets/favicon-32.png" />
+  <link rel="icon" type="image/png" sizes="192x192" href="assets/icon-192.png" />
+  <link rel="apple-touch-icon" href="assets/apple-touch-icon.png" />
   <link rel="stylesheet" href="style.css" />
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
   <style>
@@ -44,21 +47,19 @@
       gap: 32px;
     }
 
-    /* Chess piece icon */
-    .chess-icon {
-      font-size: 56px;
-      line-height: 1;
-      filter: drop-shadow(0 0 24px rgba(0, 212, 255, 0.4));
-      animation: float 3s ease-in-out infinite;
-    }
-    @keyframes float {
-      0%, 100% { transform: translateY(0); }
-      50%       { transform: translateY(-8px); }
+    /* Stage: title and icon cross-fade in the same spot */
+    .overlay-stage {
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 110px;
     }
 
-    /* Title */
+    /* Title (shown first, fades out) */
     .overlay-title {
       text-align: center;
+      transition: opacity 0.5s ease;
     }
     .overlay-title h1 {
       font-size: 32px;
@@ -74,6 +75,21 @@
       letter-spacing: 0.3px;
     }
 
+    /* Icon (hidden first, fades in over the title) */
+    .overlay-icon {
+      position: absolute;
+      width: 96px;
+      height: 96px;
+      opacity: 0;
+      transform: scale(0.85);
+      transition: opacity 0.5s ease, transform 0.5s ease;
+      filter: drop-shadow(0 0 28px rgba(0, 212, 255, 0.45));
+    }
+
+    /* Transition state: text out, icon in */
+    .overlay-stage.to-icon .overlay-title { opacity: 0; }
+    .overlay-stage.to-icon .overlay-icon  { opacity: 1; transform: scale(1); }
+
     /* Spinner */
     .overlay-spinner {
       width: 28px;
@@ -84,6 +100,10 @@
       animation: spin 0.9s linear infinite;
     }
     @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* Hero icon next to the banner title */
+    .hero-title { display: flex; align-items: center; gap: 16px; }
+    .hero-icon { width: 48px; height: 48px; flex-shrink: 0; }
   </style>
 </head>
 <body>
@@ -91,10 +111,12 @@
 <!-- ── Loading overlay ── -->
 <div id="overlay">
   <div class="overlay-card">
-    <div class="chess-icon">♟</div>
-    <div class="overlay-title">
-      <h1>Chess<span>Puzzle</span></h1>
-      <p>LLM benchmark · 300 puzzles · 6 models</p>
+    <div class="overlay-stage" id="overlay-stage">
+      <div class="overlay-title">
+        <h1>Chess<span>Puzzle</span> Benchmark</h1>
+        <p>LLM benchmark · 300 puzzles · 6 models</p>
+      </div>
+      <img class="overlay-icon" src="assets/icon-512.png" alt="ChessPuzzle Benchmark" />
     </div>
     <div class="overlay-spinner"></div>
   </div>
@@ -104,9 +126,12 @@
 <div class="hero">
   <div class="container">
     <div class="hero-inner">
-      <div>
-        <h1>Chess<span>Puzzle</span> Benchmark</h1>
-        <p>Evaluating LLM chess puzzle performance across difficulty tiers and mate types</p>
+      <div class="hero-title">
+        <img class="hero-icon" src="assets/icon-192.png" alt="" />
+        <div>
+          <h1>Chess<span>Puzzle</span> Benchmark</h1>
+          <p>Evaluating LLM chess puzzle performance across difficulty tiers and mate types</p>
+        </div>
       </div>
       <div class="chips">
         <span class="chip"><strong>300</strong> puzzles</span>
