@@ -219,6 +219,10 @@ function buildOverview(loadedModels) {
       <div class="card"><div class="card-title">Format Compliance Rate</div><div class="card-desc">% of puzzles where the model followed UCI output format instructions</div><div class="chart-wrap"><canvas id="chart-format"></canvas></div></div>
     </div>
 
+    <div class="grid-2 section">
+      <div class="card"><div class="card-title">Valid Move Rate</div><div class="card-desc">% of predicted moves that are actually legal in the position (validated with python-chess)</div><div class="chart-wrap"><canvas id="chart-valid"></canvas></div></div>
+    </div>
+
     <div class="section card">
       <div class="card-title">Total Benchmark Run Time (300 puzzles)</div>
       <div class="card-desc">Total wall-clock API time to complete the full benchmark — sum of all 300 puzzle latencies</div>
@@ -353,6 +357,7 @@ function buildModelPanel(key, data) {
       <div class="stat-card"><div class="stat-label">Accuracy</div><div class="stat-value" style="color:${color}">${pct(s.overall_accuracy)}</div><div class="stat-sub">${Math.round(s.overall_accuracy * 300)} / 300 correct</div></div>
       <div class="stat-card"><div class="stat-label">Avg Score</div><div class="stat-value muted">${s.avg_score.toFixed(3)}</div><div class="stat-sub">weighted composite</div></div>
       <div class="stat-card"><div class="stat-label">Format Compliance</div><div class="stat-value" style="color:${color}">${pct(s.format_compliance_rate ?? 0)}</div><div class="stat-sub">followed UCI instructions</div></div>
+      <div class="stat-card"><div class="stat-label">Valid Move Rate</div><div class="stat-value" style="color:${color}">${pct(s.avg_valid_ratio ?? 0)}</div><div class="stat-sub">predicted moves that are legal</div></div>
       <div class="stat-card"><div class="stat-label">Avg Latency</div><div class="stat-value muted">${ms(s.avg_latency_ms)}</div><div class="stat-sub">per puzzle</div></div>
     </div>
     ${meta.analysis ? `<details class="section card methodology" open>
