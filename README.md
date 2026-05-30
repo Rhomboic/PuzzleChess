@@ -22,16 +22,7 @@ An LLM agent benchmark that evaluates how well AI models solve chess puzzles. Ru
 
 ## Results
 
-> ⚠️ TODO: Update this table once all 6 model runs complete (expected: May 31, 2026)
-
-| Model | Accuracy | Format Compliance | Avg Latency | Avg Score |
-|---|---|---|---|---|
-| claude-haiku-4-5 | 1.7% | — | 8,330ms | 0.1759 |
-| claude-sonnet-4-6 | — | — | — | — |
-| claude-opus-4-7 | — | — | — | — |
-| gpt-4.1-mini | 1.7% | — | 1,420ms | 0.2704 |
-| gpt-4.1 | 6.3% | 86.3% | 751ms | 0.3552 |
-| o3 | — | — | — | — |
+📊 **[View full benchmark results and interactive charts → chess.adamissah.com](https://chess.adamissah.com)**
 
 ## Project structure
 
