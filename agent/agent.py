@@ -125,7 +125,7 @@ def query_openai(client: OpenAI, model: str, fen: str, mate_type: str) -> dict:
     }
     # o3 and o1 use max_completion_tokens instead of max_tokens
     if model in O3_MODELS:
-        kwargs["max_completion_tokens"] = 16000  # o3 needs room for reasoning + answer
+        kwargs["max_completion_tokens"] = 50000  # o3 needs lots of room for reasoning + answer
     else:
         kwargs["max_tokens"] = 4096
 
