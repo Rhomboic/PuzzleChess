@@ -14,42 +14,60 @@ from openai import OpenAI
 # ── Model registry ────────────────────────────────────────────────────────────
 
 ANTHROPIC_MODELS = {
+    "claude-haiku-4-5":  "claude-haiku-4-5-20251001",
     "claude-sonnet-4-6": "claude-sonnet-4-6",
-    "claude-haiku-4-5":  "claude-haiku-4-5",
+    "claude-opus-4-7":   "claude-opus-4-7",
 }
 
 OPENAI_MODELS = {
-    "gpt-4o":      "gpt-4o",
-    "gpt-4o-mini": "gpt-4o-mini",
-    "o1-mini":     "o1-mini",
-    "o3-mini":     "o3-mini",
+    "gpt-4.1-mini": "gpt-4.1-mini",
+    "gpt-4.1":      "gpt-4.1",
+    "o3":           "o3",
 }
 
 ALL_MODELS = list(ANTHROPIC_MODELS) + list(OPENAI_MODELS)
 
 # ── Prompt ────────────────────────────────────────────────────────────────────
 
-SYSTEM_PROMPT = """You are a chess engine. You will be given a chess position in FEN notation and told whose turn it is to move.
+SYSTEM_PROMPT = """You are a chess engine. You output chess moves in UCI format only.
 
-Your job is to find the checkmate sequence.
+UCI format: source square + destination square. Examples: e2e4, g1f3, e1g1
+Each move is exactly 4 characters (or 5 for pawn promotion e.g. e7e8q). Letters and numbers ONLY.
+No +, no #, no x, no symbols of any kind. No algebraic notation. No explanations.
 
-Rules:
-- Output ONLY the moves in UCI notation, separated by spaces (e.g. e2e4 d7d5 f1c4)
-- Do not explain, do not use algebraic notation, do not add any other text
-- UCI format is: source square + destination square (e.g. e2e4, g1f3, e1g1 for castling)
-- Output exactly the number of moves needed to deliver checkmate"""
+Your ANSWER line must contain only UCI moves separated by spaces — letters and numbers only."""
 
 
 def build_user_prompt(fen: str, mate_type: str) -> str:
     board = chess.Board(fen)
     turn = "White" if board.turn == chess.WHITE else "Black"
-    mate_in = mate_type.replace("mateIn", "")
+    mate_in = int(mate_type.replace("mateIn", ""))
+    total_moves = mate_in * 2 - 1  # mateIn1=1, mateIn2=3, mateIn3=5, etc.
+    opponent = "Black" if turn == "White" else "White"
     return (
-        f"Position (FEN): {fen}\n"
-        f"It is {turn}'s turn to move.\n"
-        f"Find the checkmate in {mate_in} moves.\n"
-        f"Output only the UCI moves:"
+        f"FEN: {fen}\n"
+        f"{turn} to move. Find checkmate in {mate_in} moves.\n"
+        f"Output exactly {total_moves} UCI moves alternating: {turn} move, {opponent} response, {turn} move, and so on.\n"
+        f"Think through the position, then end your response with this exact line:\n"
+        f"ANSWER: <{total_moves} UCI moves>\n"
+        f"Example for mateIn2 (3 moves): ANSWER: e2e4 d7d5 f1b5"
     )
+
+
+def extract_uci_moves(text: str) -> str:
+    """Extract UCI moves from the ANSWER: tag in model output."""
+    import re
+
+    # find the ANSWER: line
+    match = re.search(r'ANSWER:\s*(.+)', text, re.IGNORECASE)
+    answer_text = match.group(1).strip() if match else text
+
+    # strip capture notation 'x' so g7xg6 becomes g7g6
+    answer_text = re.sub(r'([a-h][1-8])x([a-h][1-8])', r'\1\2', answer_text.lower())
+
+    # extract all UCI move tokens
+    tokens = re.findall(r'[a-h][1-8][a-h][1-8][qrbn]?', answer_text)
+    return " ".join(tokens)
 
 
 # ── Claude agent ──────────────────────────────────────────────────────────────
@@ -58,21 +76,22 @@ def query_claude(client: anthropic.Anthropic, model: str, fen: str, mate_type: s
     start = time.time()
     response = client.messages.create(
         model=model,
-        max_tokens=64,
+        max_tokens=2048,
         system=[
             {
                 "type": "text",
                 "text": SYSTEM_PROMPT,
-                "cache_control": {"type": "ephemeral"},  # cache system prompt across calls
+                "cache_control": {"type": "ephemeral"},
             }
         ],
         messages=[
-            {"role": "user", "content": build_user_prompt(fen, mate_type)}
+            {"role": "user", "content": build_user_prompt(fen, mate_type)},
         ],
     )
     latency_ms = int((time.time() - start) * 1000)
+    raw = response.content[0].text
     return {
-        "predicted_moves": response.content[0].text.strip(),
+        "predicted_moves": extract_uci_moves(raw),
         "latency_ms":      latency_ms,
         "input_tokens":    response.usage.input_tokens,
         "output_tokens":   response.usage.output_tokens,
@@ -85,15 +104,20 @@ def query_openai(client: OpenAI, model: str, fen: str, mate_type: str) -> dict:
     start = time.time()
     response = client.chat.completions.create(
         model=model,
-        max_tokens=64,
+        max_tokens=4096,
         messages=[
             {"role": "system", "content": SYSTEM_PROMPT},
             {"role": "user",   "content": build_user_prompt(fen, mate_type)},
         ],
     )
     latency_ms = int((time.time() - start) * 1000)
+    raw = response.choices[0].message.content
+    extracted = extract_uci_moves(raw)
+    expected = int(mate_type.replace("mateIn", "")) * 2 - 1
+    if len(extracted.split()) != expected:
+        print(f"\nDEBUG MISMATCH (expected {expected} moves): {repr(raw)}\n")
     return {
-        "predicted_moves": response.choices[0].message.content.strip(),
+        "predicted_moves": extracted,
         "latency_ms":      latency_ms,
         "input_tokens":    response.usage.prompt_tokens,
         "output_tokens":   response.usage.completion_tokens,
@@ -145,6 +169,7 @@ def run_agent(puzzles: list, model: str) -> list:
 
         results.append({
             "PuzzleId":        puzzle_id,
+            "FEN":             fen,
             "model":           model,
             "predicted_moves": response["predicted_moves"],
             "correct_moves":   solution,

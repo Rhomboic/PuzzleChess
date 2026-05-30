@@ -72,8 +72,9 @@ def score_puzzle(puzzle: dict) -> dict:
     latency_ms     = puzzle.get("latency_ms", MAX_LATENCY_MS)
     total_moves    = len(correct.strip().split()) if correct.strip() else 0
 
-    # move validity
-    validity       = validate_moves(fen, predicted)
+    # move validity — only validate up to the expected number of moves
+    predicted_capped = " ".join(predicted.strip().split()[:total_moves]) if predicted.strip() else ""
+    validity       = validate_moves(fen, predicted_capped)
     move_validity  = validity["move_validity"]
     valid_count    = validity["valid_moves_count"]
     valid_ratio    = round(valid_count / total_moves, 4) if total_moves > 0 else 0.0
@@ -81,28 +82,31 @@ def score_puzzle(puzzle: dict) -> dict:
     # correctness — exact match
     is_correct     = int(predicted.strip().split() == correct.strip().split())
 
+    # output format followed — did the model return the expected number of UCI moves?
+    predicted_count        = len(predicted.strip().split()) if predicted.strip() else 0
+    output_format_followed = int(predicted_count == total_moves) if total_moves > 0 else 0
+
     # latency component
     capped_latency = min(latency_ms, MAX_LATENCY_MS)
     norm_latency   = capped_latency / MAX_LATENCY_MS if capped_latency > 0 else 1.0
-    latency_score  = 1 / norm_latency if norm_latency > 0 else 0.0
-    # normalize latency_score to [0,1] — max is 1/epsilon, so we just cap contribution
-    latency_contrib = min(latency_score / (MAX_LATENCY_MS), 1.0)
 
     score = round(
-        0.5 * is_correct
-        + 0.4 * valid_ratio
-        + 0.1 * (1 - norm_latency),  # lower latency = higher score
+        0.45 * is_correct
+        + 0.35 * valid_ratio
+        + 0.10 * (1 - norm_latency)
+        + 0.10 * output_format_followed,
         4
     )
 
     return {
         **puzzle,
-        "move_validity":     move_validity,
-        "valid_moves_count": valid_count,
-        "total_moves":       total_moves,
-        "valid_ratio":       valid_ratio,
-        "correct":           is_correct,
-        "score":             score,
+        "move_validity":          move_validity,
+        "valid_moves_count":      valid_count,
+        "total_moves":            total_moves,
+        "valid_ratio":            valid_ratio,
+        "correct":                is_correct,
+        "output_format_followed": output_format_followed,
+        "score":                  score,
     }
 
 
@@ -138,15 +142,16 @@ def aggregate(scored_puzzles: list) -> dict:
     }
 
     return {
-        "total_puzzles":        n,
-        "overall_accuracy":     avg("correct"),
-        "avg_score":            avg("score"),
-        "avg_valid_ratio":      avg("valid_ratio"),
-        "avg_latency_ms":       avg("latency_ms"),
-        "avg_input_tokens":     avg("input_tokens"),
-        "avg_output_tokens":    avg("output_tokens"),
-        "accuracy_by_tier":     accuracy_by_tier,
-        "accuracy_by_mate_type": accuracy_by_mate_type,
+        "total_puzzles":          n,
+        "overall_accuracy":       avg("correct"),
+        "avg_score":              avg("score"),
+        "avg_valid_ratio":        avg("valid_ratio"),
+        "format_compliance_rate": avg("output_format_followed"),
+        "avg_latency_ms":         avg("latency_ms"),
+        "avg_input_tokens":       avg("input_tokens"),
+        "avg_output_tokens":      avg("output_tokens"),
+        "accuracy_by_tier":       accuracy_by_tier,
+        "accuracy_by_mate_type":  accuracy_by_mate_type,
     }
 
 

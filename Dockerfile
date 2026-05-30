@@ -15,5 +15,8 @@ COPY main.py .
 # results/ dir for local writes before S3 upload
 RUN mkdir -p results
 
-# MODEL and API keys are injected at runtime via ECS — never baked in
+# MODEL is baked into the image at build time — API keys injected at runtime
+ARG MODEL
+ENV MODEL=$MODEL
+
 ENTRYPOINT ["python", "main.py"]
