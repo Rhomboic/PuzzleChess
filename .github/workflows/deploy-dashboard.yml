@@ -35,6 +35,12 @@ jobs:
           CF_ID=$(aws cloudfront list-distributions \
             --query "DistributionList.Items[?Aliases.Items[?contains(@,'chess.adamissah.com')]].Id" \
             --output text)
+          if [ -z "$CF_ID" ] || [ "$CF_ID" = "None" ]; then
+            echo "No CloudFront distribution for chess.adamissah.com yet — skipping invalidation."
+            echo "(Dashboard files synced to S3; cache invalidation will run once CloudFront exists.)"
+            exit 0
+          fi
+          echo "Invalidating distribution $CF_ID ..."
           aws cloudfront create-invalidation \
-            --distribution-id $CF_ID \
+            --distribution-id "$CF_ID" \
             --paths "/*"
