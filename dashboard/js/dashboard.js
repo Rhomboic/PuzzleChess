@@ -59,7 +59,7 @@ const MODEL_META = {
     label: 'o3', provider: 'openai', tier: 'Reasoning',
     analysis: `
       <div class="method-section"><h3>Profile</h3>
-      <p>A different class entirely: <strong>76% accuracy</strong> (71.3% exact + 14 alternate mates) versus single digits for every other model, with 92% format compliance and a 92% legal-move rate. It degrades <em>gracefully</em> with difficulty where the others flatline near zero. The cost is latency (~104s per puzzle) and price (~16k output tokens).</p></div>
+      <p>A different class entirely: <strong>76% accuracy</strong> (71.3% exact + 14 alternate mates) versus single digits for every other model, with 92% format compliance and a 92% legal-move rate. It degrades <em>gracefully</em> where the others flatline near zero: by mate length, 97% on mate-in-1 down to 53% on mate-in-5; by difficulty, 87% on beginner puzzles down to 59% on expert. The cost is latency (~104s per puzzle) and price (~16k output tokens).</p></div>
       <div class="method-section"><h3>What stands out: it knows when it's stuck</h3>
       <p>o3 has a failure mode the others lack: when it genuinely cannot find a forced mate, it <strong>says so</strong> ("I can't solve this") instead of inventing a plausible-looking wrong line. Its misses are mostly explicit refusals or last-move near-misses, not confident hallucinations &mdash; a real calibration edge the accuracy number alone does not capture.</p></div>`,
   },
