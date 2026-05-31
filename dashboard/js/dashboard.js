@@ -105,10 +105,15 @@ async function fetchManifest() {
   }
 }
 
+// Use the alternate-mate-rescored files. Each carries BOTH numbers in its summary:
+//   summary.exact_match_rate  → original accuracy (exact Lichess line only)
+//   summary.overall_accuracy  → accuracy when alternative final mates are accepted
+// (Lichess accepts any mate on the final move, so a line that matches the forced
+// solution but finishes with a different legal mate still counts as solved.)
 function resultsFile(key, mode) {
   return mode === 'reasoning'
-    ? `${key}_reasoning_results.json`
-    : `${key}_results.json`;
+    ? `${key}_alternate_mate_reasoning_results.json`
+    : `${key}_alternate_mate_results.json`;
 }
 
 async function fetchModel(key, mode) {
@@ -262,7 +267,7 @@ function buildOverview(loadedModels) {
 
     tbody.innerHTML += `<tr class="${data ? '' : 'pending-row'}">
       <td><span class="model-name">${meta.label}</span><span class="badge ${data ? badgeClass : 'badge-pending'}">${data ? provider : 'Pending'}</span></td>
-      <td>${s ? pct(s.overall_accuracy) : '—'}</td>
+      <td>${s ? pct(s.overall_accuracy) : '—'}${(s && s.exact_match_rate != null && s.exact_match_rate !== s.overall_accuracy) ? `<br><span class="muted" style="font-size:11px">${pct(s.exact_match_rate)} exact</span>` : ''}</td>
       <td>${s ? s.avg_score.toFixed(3) : '—'}</td>
       <td>${s ? pct(s.avg_valid_ratio) : '—'}</td>
       <td>${s ? pct(s.format_compliance_rate ?? 0) : '—'}</td>
@@ -374,7 +379,7 @@ function buildModelPanel(key, data) {
       <span style="${badgeStyle};border-radius:20px;padding:4px 12px;font-size:11px;font-weight:600;text-transform:uppercase">${provider} · ${meta.tier}</span>
     </div>
     <div class="stat-grid">
-      <div class="stat-card"><div class="stat-label">Accuracy</div><div class="stat-value" style="color:${color}">${pct(s.overall_accuracy)}</div><div class="stat-sub">${Math.round(s.overall_accuracy * 300)} / 300 correct</div></div>
+      <div class="stat-card"><div class="stat-label">Accuracy</div><div class="stat-value" style="color:${color}">${pct(s.overall_accuracy)}</div><div class="stat-sub">with alternate mates · ${Math.round(s.overall_accuracy * 300)} / 300${(s.exact_match_rate != null && s.exact_match_rate !== s.overall_accuracy) ? `<br><span class="muted">${pct(s.exact_match_rate)} exact Lichess line · ${Math.round(s.exact_match_rate * 300)} / 300</span>` : ''}</div></div>
       <div class="stat-card"><div class="stat-label">Avg Score</div><div class="stat-value muted">${s.avg_score.toFixed(3)}</div><div class="stat-sub">weighted composite</div></div>
       <div class="stat-card"><div class="stat-label">Format Compliance</div><div class="stat-value" style="color:${color}">${pct(s.format_compliance_rate ?? 0)}</div><div class="stat-sub">followed UCI instructions</div></div>
       <div class="stat-card"><div class="stat-label">Valid Move Rate</div><div class="stat-value" style="color:${color}">${pct(s.avg_valid_ratio ?? 0)}</div><div class="stat-sub">predicted moves that are legal</div></div>
