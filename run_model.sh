@@ -1,19 +1,40 @@
 #!/bin/bash
 # run_model.sh — build, push, and launch the benchmark for a single model.
 #
-# Usage:  ./run_model.sh <model-name>
-# Example: ./run_model.sh claude-opus-4-8
+# Usage:  ./run_model.sh <model-name> [api-model-id] [--reasoning]
+# Examples:
+#   ./run_model.sh claude-opus-4-8
+#   ./run_model.sh claude-opus-4-8 --reasoning
+#   ./run_model.sh claude-sonnet-3-7 claude-3-7-sonnet-20250219 --reasoning
 #
-# The model must already be registered in agent/agent.py and have an ECS task
-# definition (added via terraform var.models + merge). API keys come from
-# Secrets Manager at runtime; nothing sensitive is needed here.
+# The model must be registered in agent/agent.py and have an ECS task definition
+# (terraform var.models). API keys come from Secrets Manager at runtime.
+# --reasoning passes REASONING=true as a container env override; main.py turns on
+# extended thinking and writes to a separate {model}_reasoning_results.json so it
+# does not overwrite the regular run.
 
 set -euo pipefail
 
-MODEL="${1:-}"
+# ── Parse args: positional <model> [api-id], plus optional --reasoning ─────────
+MODEL=""
+API_ID=""
+REASONING="false"
+for arg in "$@"; do
+  case "$arg" in
+    --reasoning) REASONING="true" ;;
+    *)
+      if [ -z "$MODEL" ]; then MODEL="$arg"
+      elif [ -z "$API_ID" ]; then API_ID="$arg"
+      fi
+      ;;
+  esac
+done
+API_ID="${API_ID:-$MODEL}"
+
 if [ -z "$MODEL" ]; then
-  echo "Usage: ./run_model.sh <model-name>"
+  echo "Usage: ./run_model.sh <model-name> [api-model-id] [--reasoning]"
   echo "Example: ./run_model.sh claude-opus-4-8"
+  echo "Example: ./run_model.sh claude-opus-4-8 --reasoning"
   exit 1
 fi
 
@@ -30,6 +51,7 @@ TASK_DEF="${PROJECT}-${MODEL//./-}"   # ECS family: dots -> dashes
 echo "  ECR:       $ECR_URL"
 echo "  Cluster:   $CLUSTER"
 echo "  Task def:  $TASK_DEF"
+echo "  Reasoning: $REASONING"
 echo ""
 
 # ── 1. Build (linux/amd64 for Fargate) ────────────────────────────────────────
@@ -46,13 +68,16 @@ docker tag "puzzlechess-${MODEL}" "${ECR_URL}:${MODEL}"
 docker push "${ECR_URL}:${MODEL}"
 
 # ── 3. Launch the task on Fargate ─────────────────────────────────────────────
-echo "==> Launching ECS task..."
+# REASONING is a runtime container env override (the image bakes only MODEL), so
+# the same image/task-def serves both regular and reasoning runs.
+echo "==> Launching ECS task (REASONING=$REASONING)..."
 TASK_ARN=$(aws ecs run-task \
   --cluster "$CLUSTER" \
   --task-definition "$TASK_DEF" \
   --launch-type FARGATE \
   --region "$REGION" \
   --network-configuration "awsvpcConfiguration={subnets=[$SUBNETS],securityGroups=[$SECURITY_GROUP],assignPublicIp=ENABLED}" \
+  --overrides "{\"containerOverrides\":[{\"name\":\"${PROJECT}\",\"environment\":[{\"name\":\"REASONING\",\"value\":\"${REASONING}\"}]}]}" \
   --query 'tasks[0].taskArn' \
   --output text)
 

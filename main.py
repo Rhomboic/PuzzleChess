@@ -24,50 +24,63 @@ import boto3
 from dotenv import load_dotenv
 
 from data.load_puzzles import load_puzzles
-from agent.agent import run_agent, ALL_MODELS
+from agent.agent import run_agent, ALL_MODELS, effective_mode
 from eval.eval import score_results, write_results
 
 PUZZLES_FILE = "data/puzzles_filtered.csv"
 
 
-def upload_to_s3(local_path: str, model: str) -> None:
+def results_filename(model: str, mode: str) -> str:
+    """S3/local results filename. Reasoning runs get a separate file so they
+    don't overwrite regular runs (and vice versa)."""
+    suffix = "_reasoning_results.json" if mode == "reasoning" else "_results.json"
+    return f"{model}{suffix}"
+
+
+def upload_to_s3(local_path: str, model: str, mode: str) -> None:
     bucket = os.environ.get("S3_BUCKET")
     if not bucket:
         print("  S3_BUCKET not set — skipping S3 upload")
         return
 
     prefix = os.environ.get("S3_KEY_PREFIX", "")
-    s3_key = f"{prefix}{model}_results.json"
+    s3_key = f"{prefix}{results_filename(model, mode)}"
 
     print(f"  Uploading to s3://{bucket}/{s3_key} ...")
     s3 = boto3.client("s3")
     s3.upload_file(local_path, bucket, s3_key)
     print(f"  Upload complete")
 
-    update_manifest(s3, model, bucket, prefix)
+    update_manifest(s3, model, mode, bucket, prefix)
 
 
-def update_manifest(s3, model: str, bucket: str, prefix: str) -> None:
-    """Add this model to the manifest.json in S3 so the dashboard knows it exists."""
+def update_manifest(s3, model: str, mode: str, bucket: str, prefix: str) -> None:
+    """Manifest maps each model to the list of modes it has results for, e.g.
+    {"claude-opus-4-8": ["regular", "reasoning"], "o3": ["reasoning"]}.
+    Tolerates and migrates the old flat-array form."""
     key = f"{prefix}manifest.json"
     try:
         obj = s3.get_object(Bucket=bucket, Key=key)
-        models = json.loads(obj["Body"].read())
-    except s3.exceptions.NoSuchKey:
-        models = []
+        data = json.loads(obj["Body"].read())
     except Exception:
-        models = []
+        data = {}
 
-    if model not in models:
-        models.append(model)
+    # Migrate old array form (all entries were regular runs).
+    if isinstance(data, list):
+        data = {m: ["regular"] for m in data}
+
+    modes = data.get(model, [])
+    if mode not in modes:
+        modes.append(mode)
+    data[model] = modes
 
     s3.put_object(
         Bucket=bucket,
         Key=key,
-        Body=json.dumps(models),
+        Body=json.dumps(data),
         ContentType="application/json",
     )
-    print(f"  Manifest updated: {models}")
+    print(f"  Manifest updated: {model} -> {modes}")
 
 
 def main():
@@ -85,9 +98,14 @@ def main():
         print(f"Choose from: {ALL_MODELS}")
         sys.exit(1)
 
+    # REASONING flag (default off). Only affects Claude; effective_mode resolves
+    # o3 -> reasoning and gpt-4.1/mini -> regular regardless of the flag.
+    reasoning = os.environ.get("REASONING", "false").strip().lower() in ("1", "true", "yes")
+    mode = effective_mode(model, reasoning)
+
     print(f"\n{'='*60}")
     print(f"PuzzleChess Benchmark")
-    print(f"Model: {model}")
+    print(f"Model: {model}  |  Mode: {mode}")
     print(f"{'='*60}\n")
 
     # ── Load puzzles ───────────────────────────────────────────────────────────
@@ -97,19 +115,19 @@ def main():
 
     # ── Run agent ──────────────────────────────────────────────────────────────
     print(f"Running agent ({model}) on {len(puzzles)} puzzles...")
-    results = run_agent(puzzles, model)
+    results = run_agent(puzzles, model, reasoning=reasoning)
     print()
 
     # ── Score results ──────────────────────────────────────────────────────────
     scored = score_results(results)
     print()
 
-    # ── Write results locally ──────────────────────────────────────────────────
-    local_path = write_results(scored)
+    # ── Write results locally (mode-specific filename) ──────────────────────────
+    local_path = write_results(scored, filename=results_filename(model, mode))
     print()
 
     # ── Upload to S3 ───────────────────────────────────────────────────────────
-    upload_to_s3(local_path, model)
+    upload_to_s3(local_path, model, mode)
 
     print(f"\n{'='*60}")
     print(f"Done. Model: {model}")
