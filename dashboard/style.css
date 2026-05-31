@@ -51,6 +51,46 @@ body {
 .chip strong { color: var(--accent); }
 
 /* ── Tabs ── */
+/* ── Mode toggle (Reasoning | Regular) ── */
+.mode-toggle {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 24px 0 4px;
+  flex-wrap: wrap;
+}
+.mode-toggle-label {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+.mode-switch {
+  display: inline-flex;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 3px;
+}
+.mode-btn {
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 6px 16px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+.mode-btn:hover { color: var(--text); }
+.mode-btn.active { background: var(--accent); color: #06121a; }
+.mode-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+.mode-toggle-hint { font-size: 12px; color: var(--text-dim); }
+@media (max-width: 640px) { .mode-toggle-hint { display: none; } }
+
 .tabs-bar {
   display: flex;
   gap: 2px;

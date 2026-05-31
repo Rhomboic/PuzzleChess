@@ -190,11 +190,13 @@ def score_results(results: list) -> dict:
     }
 
 
-def write_results(scored_dict: dict, output_dir: str = "results") -> str:
-    """Write scored results to results/{model}_results.json."""
+def write_results(scored_dict: dict, output_dir: str = "results", filename: str = None) -> str:
+    """Write scored results locally. Defaults to {model}_results.json; pass
+    `filename` (e.g. {model}_reasoning_results.json) to keep modes separate."""
     os.makedirs(output_dir, exist_ok=True)
     model = scored_dict["model"].replace("/", "-")
-    path = os.path.join(output_dir, f"{model}_results.json")
+    name = filename or f"{model}_results.json"
+    path = os.path.join(output_dir, name)
     with open(path, "w") as f:
         json.dump(scored_dict, f, indent=2)
     print(f"  Results written to {path}")

@@ -86,19 +86,34 @@ function slug(k) { return k.replace(/\./g, '-'); }
 
 // ── Fetch helpers ─────────────────────────────────────────────────────────────
 
+// Manifest maps model -> list of available modes, e.g.
+// { "claude-opus-4-8": ["regular","reasoning"], "o3": ["reasoning"] }.
+// Tolerates the legacy flat-array form (every entry treated as regular).
 async function fetchManifest() {
   try {
     const res = await fetch(S3_BASE + 'manifest.json');
-    if (!res.ok) return [];
-    return await res.json();
+    if (!res.ok) return {};
+    const data = await res.json();
+    if (Array.isArray(data)) {
+      const obj = {};
+      data.forEach(m => { obj[m] = ['regular']; });
+      return obj;
+    }
+    return data;
   } catch {
-    return [];
+    return {};
   }
 }
 
-async function fetchModel(key) {
+function resultsFile(key, mode) {
+  return mode === 'reasoning'
+    ? `${key}_reasoning_results.json`
+    : `${key}_results.json`;
+}
+
+async function fetchModel(key, mode) {
   try {
-    const res = await fetch(`${S3_BASE}${key}_results.json`);
+    const res = await fetch(`${S3_BASE}${resultsFile(key, mode)}`);
     if (!res.ok) return null;
     return await res.json();
   } catch {
@@ -233,13 +248,10 @@ function buildOverview(loadedModels) {
 
   const tbody = document.getElementById('overview-tbody');
 
-  // Union of known models (for pending rows) and any model present in the
-  // manifest/results, so newly-added models show up without a code change.
-  // Loaded models first, sorted by accuracy; then any known-but-pending models.
-  const loadedKeys = Object.keys(loadedModels)
+  // Only the models present in the current mode, sorted by accuracy. No "pending"
+  // rows: under the mode toggle a model simply isn't shown in a mode it lacks.
+  const tableKeys = Object.keys(loadedModels)
     .sort((a, b) => loadedModels[b].summary.overall_accuracy - loadedModels[a].summary.overall_accuracy);
-  const pendingKeys = Object.keys(MODEL_META).filter(k => !loadedModels[k]);
-  const tableKeys = [...loadedKeys, ...pendingKeys];
 
   tableKeys.forEach(key => {
     const meta = MODEL_META[key] || { label: key, provider: modelProvider(key) };
@@ -439,54 +451,79 @@ async function dismissOverlay() {
   overlay.remove();
 }
 
-async function init() {
-  // Show the title at least 500ms before the text->icon transition begins.
-  const minTitleTime = wait(500);
+// Loaded results keyed by mode then model: LOADED.reasoning[key] / LOADED.regular[key].
+const LOADED = { reasoning: {}, regular: {} };
+let MANIFEST = {};
+let currentMode = 'reasoning';
 
-  const available = await fetchManifest();
+// Render the dashboard for one mode: rebuild tab bar, overview, and panels using
+// only the models that have results in that mode.
+function render(mode) {
+  currentMode = mode;
+  const loaded = LOADED[mode];
+  const keys = Object.keys(loaded)
+    .sort((a, b) => loaded[b].summary.overall_accuracy - loaded[a].summary.overall_accuracy);
 
-  // Determine full model list: known models + any unknown ones from manifest
-  const allKeys = [...new Set([...Object.keys(MODEL_META), ...available])];
+  document.getElementById('tabs-bar').innerHTML = '';
+  document.getElementById('panels').innerHTML = '';
 
-  // Fetch data for available models
-  const loadedModels = {};
-  await Promise.all(
-    available.map(async key => {
-      const data = await fetchModel(key);
-      if (data) loadedModels[key] = data;
-    })
-  );
+  document.querySelectorAll('.mode-btn').forEach(b => {
+    b.classList.toggle('active', b.dataset.mode === mode);
+  });
 
-  // Wait for the minimum title display, then run the icon transition + dismiss.
-  await minTitleTime;
-  await dismissOverlay();
+  const chip = document.getElementById('chip-models');
+  if (chip) chip.innerHTML = `<strong>${keys.length}</strong> models`;
 
-  // Update chips
-  document.getElementById('chip-models').textContent = Object.keys(loadedModels).length + ' / ' + allKeys.length + ' models';
-
-  // Build overview tab first
   createTab('overview', 'Overview', false);
   const overviewPanel = document.createElement('div');
   overviewPanel.id = 'panel-overview';
   overviewPanel.className = 'tab-panel';
   document.getElementById('panels').appendChild(overviewPanel);
-  buildOverview(loadedModels);
+  buildOverview(loaded);
 
-  // Build per-model tabs
-  allKeys.forEach(key => {
+  keys.forEach(key => {
     const meta = MODEL_META[key] || { label: key };
-    const hasData = !!loadedModels[key];
-    createTab(key, meta.label, !hasData);
+    createTab(key, meta.label || key, false);
     createPanel(key);
-    if (hasData) {
-      buildModelPanel(key, loadedModels[key]);
-    } else {
-      buildPendingPanel(key);
-    }
+    buildModelPanel(key, loaded[key]);
   });
 
-  // Activate overview
   switchTab('overview');
+}
+
+async function init() {
+  // Show the title at least 500ms before the text->icon transition begins.
+  const minTitleTime = wait(500);
+
+  MANIFEST = await fetchManifest();
+
+  // Fetch every (model, mode) result file the manifest advertises.
+  const jobs = [];
+  for (const [key, modes] of Object.entries(MANIFEST)) {
+    for (const mode of modes) {
+      jobs.push((async () => {
+        const data = await fetchModel(key, mode);
+        if (data) LOADED[mode][key] = data;
+      })());
+    }
+  }
+  await Promise.all(jobs);
+
+  // Default to whichever mode has data (prefer reasoning).
+  if (Object.keys(LOADED.reasoning).length === 0 && Object.keys(LOADED.regular).length > 0) {
+    currentMode = 'regular';
+  }
+
+  await minTitleTime;
+  await dismissOverlay();
+
+  document.querySelectorAll('.mode-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      if (btn.dataset.mode !== currentMode) render(btn.dataset.mode);
+    });
+  });
+
+  render(currentMode);
 }
 
 document.addEventListener('DOMContentLoaded', init);

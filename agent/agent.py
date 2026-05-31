@@ -71,38 +71,79 @@ def extract_uci_moves(text: str) -> str:
     return " ".join(tokens)
 
 
+# ── Mode helper ───────────────────────────────────────────────────────────────
+
+# o3 always reasons (inherent reasoning model); gpt-4.1 / gpt-4.1-mini never do
+# (not reasoning models). Claude models can do both, controlled by the flag.
+REASONING_ONLY = {"o3", "o1", "o1-mini", "o3-mini"}
+REGULAR_ONLY   = {"gpt-4.1", "gpt-4.1-mini", "gpt-4o", "gpt-4o-mini"}
+
+def effective_mode(model: str, reasoning_requested: bool) -> str:
+    """Resolve the actual mode a model runs in, given the requested flag."""
+    if model in REASONING_ONLY:
+        return "reasoning"
+    if model in REGULAR_ONLY:
+        return "regular"
+    return "reasoning" if reasoning_requested else "regular"
+
+
 # ── Claude agent ──────────────────────────────────────────────────────────────
 
-# Extended thinking budget for Claude. o3 was observed using ~16k reasoning
-# tokens per puzzle, so we give Claude a generous, comparable budget so neither
-# side is handicapped. max_tokens must exceed the thinking budget (it covers
-# thinking + the final answer).
-CLAUDE_THINKING_BUDGET = 32000
-CLAUDE_MAX_TOKENS      = CLAUDE_THINKING_BUDGET + 8000
+# Reasoning budget matched to o3's ceiling for a fair comparison: o3 uses
+# max_completion_tokens=50000, so Claude gets max_tokens=50000 with the thinking
+# budget just under it (the rest covers the short final answer).
+CLAUDE_MAX_TOKENS      = 50000
+CLAUDE_THINKING_BUDGET = 45000
 
-def query_claude(client: anthropic.Anthropic, model: str, fen: str, mate_type: str) -> dict:
+# Some newer Claude models reject thinking.type=enabled and require the adaptive
+# form (thinking.type=adaptive + output_config.effort). We try enabled first and,
+# on that specific 400, switch this model to adaptive for the rest of the run.
+_CLAUDE_THINKING_STYLE = {}  # model -> "enabled" | "adaptive"
+
+def _claude_reasoning_call(client, model, fen, mate_type, style):
+    common = dict(
+        model=model,
+        max_tokens=CLAUDE_MAX_TOKENS,
+        system=[{"type": "text", "text": SYSTEM_PROMPT,
+                 "cache_control": {"type": "ephemeral"}}],
+        messages=[{"role": "user", "content": build_user_prompt(fen, mate_type)}],
+    )
+    if style == "adaptive":
+        common["thinking"] = {"type": "adaptive"}
+        common["output_config"] = {"effort": "high"}
+    else:  # enabled
+        common["thinking"] = {"type": "enabled", "budget_tokens": CLAUDE_THINKING_BUDGET}
+    with client.messages.stream(**common) as stream:
+        return stream.get_final_message()
+
+
+def query_claude(client: anthropic.Anthropic, model: str, fen: str, mate_type: str,
+                 reasoning: bool) -> dict:
     import random
     for attempt in range(5):
         try:
             start = time.time()
-            # Stream: extended thinking with a high token budget can exceed the
-            # non-streaming request limit, so we stream and assemble the final message.
-            with client.messages.stream(
-                model=model,
-                max_tokens=CLAUDE_MAX_TOKENS,
-                thinking={"type": "enabled", "budget_tokens": CLAUDE_THINKING_BUDGET},
-                system=[
-                    {
-                        "type": "text",
-                        "text": SYSTEM_PROMPT,
-                        "cache_control": {"type": "ephemeral"},
-                    }
-                ],
-                messages=[
-                    {"role": "user", "content": build_user_prompt(fen, mate_type)},
-                ],
-            ) as stream:
-                response = stream.get_final_message()
+            if reasoning:
+                style = _CLAUDE_THINKING_STYLE.get(model, "enabled")
+                try:
+                    response = _claude_reasoning_call(client, model, fen, mate_type, style)
+                except Exception as te:
+                    msg = str(te)
+                    # Wrong thinking form for this model: flip and retry once.
+                    if style == "enabled" and "adaptive" in msg and "thinking" in msg:
+                        _CLAUDE_THINKING_STYLE[model] = "adaptive"
+                        print(" [switching to adaptive thinking]", flush=True)
+                        response = _claude_reasoning_call(client, model, fen, mate_type, "adaptive")
+                    else:
+                        raise
+            else:
+                response = client.messages.create(
+                    model=model,
+                    max_tokens=2048,
+                    system=[{"type": "text", "text": SYSTEM_PROMPT,
+                             "cache_control": {"type": "ephemeral"}}],
+                    messages=[{"role": "user", "content": build_user_prompt(fen, mate_type)}],
+                )
             latency_ms = int((time.time() - start) * 1000)
             break
         except Exception as e:
@@ -114,8 +155,7 @@ def query_claude(client: anthropic.Anthropic, model: str, fen: str, mate_type: s
             else:
                 raise
 
-    # With extended thinking, content holds thinking block(s) then the text block.
-    # Grab the last text block (ignore thinking / redacted_thinking blocks).
+    # content may hold thinking block(s) before the text block; take the text block.
     raw = ""
     for block in response.content:
         if getattr(block, "type", None) == "text":
@@ -141,9 +181,12 @@ def query_openai(client: OpenAI, model: str, fen: str, mate_type: str) -> dict:
             {"role": "user",   "content": build_user_prompt(fen, mate_type)},
         ],
     }
-    # o3 and o1 use max_completion_tokens instead of max_tokens
+    # o3 and o1 use max_completion_tokens instead of max_tokens, and take a
+    # reasoning_effort knob. We run at "high" to match Claude's high adaptive
+    # effort for a fair maximum-effort-vs-maximum-effort comparison.
     if model in O3_MODELS:
-        kwargs["max_completion_tokens"] = 50000  # o3 needs lots of room for reasoning + answer
+        kwargs["max_completion_tokens"] = 50000  # room for reasoning + answer
+        kwargs["reasoning_effort"] = "high"
     else:
         kwargs["max_tokens"] = 4096
 
@@ -179,13 +222,15 @@ def query_openai(client: OpenAI, model: str, fen: str, mate_type: str) -> dict:
 
 # ── Main agent loop ───────────────────────────────────────────────────────────
 
-def run_agent(puzzles: list, model: str) -> list:
+def run_agent(puzzles: list, model: str, reasoning: bool = False) -> list:
     """
     Run the agent on a list of puzzles.
 
     Args:
-        puzzles: list of dicts with keys: PuzzleId, FEN, Solution, MateType, Tier, Rating
-        model:   model name string (must be in ALL_MODELS)
+        puzzles:   list of dicts with keys: PuzzleId, FEN, Solution, MateType, Tier, Rating
+        model:     model name string (must be in ALL_MODELS)
+        reasoning: request reasoning mode. Only affects Claude models; o3 always
+                   reasons and gpt-4.1/mini never do (see effective_mode).
 
     Returns:
         list of result dicts with PuzzleId, model, predicted_moves, correct_moves, etc.
@@ -194,6 +239,8 @@ def run_agent(puzzles: list, model: str) -> list:
         raise ValueError(f"Unknown model: {model}. Choose from {ALL_MODELS}")
 
     is_claude = model in ANTHROPIC_MODELS
+    mode = effective_mode(model, reasoning)
+    print(f"  Mode: {mode}")
 
     if is_claude:
         # Longer timeout: extended thinking can make individual calls slow.
@@ -213,7 +260,7 @@ def run_agent(puzzles: list, model: str) -> list:
 
         try:
             if is_claude:
-                response = query_claude(client, model, fen, mate_type)
+                response = query_claude(client, model, fen, mate_type, reasoning=(mode == "reasoning"))
             else:
                 response = query_openai(client, model, fen, mate_type)
             print(f"-> {response['predicted_moves']} ({response['latency_ms']}ms)")
