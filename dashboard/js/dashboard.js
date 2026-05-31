@@ -190,7 +190,7 @@ function buildOverview(loadedModels) {
         <div class="method-section">
           <h3>Eval Metrics</h3>
           <div class="method-grid">
-            <div class="method-item"><span class="method-label">Accuracy</span><span class="method-val">Exact match of full move sequence (binary)</span></div>
+            <div class="method-item"><span class="method-label">Accuracy</span><span class="method-val">A solved puzzle (binary). Reported two ways: the exact Lichess-line rate, and the rate with alternate final mates accepted (see "How the verifier evolved")</span></div>
             <div class="method-item"><span class="method-label">Valid Ratio</span><span class="method-val">Share of predicted moves that are legal in the position (validated with python-chess)</span></div>
             <div class="method-item"><span class="method-label">Format Compliance</span><span class="method-val">Output was the right number of well-formed UCI moves, capturing both notation (e.g. e2e4, not Rxf8#) and sequence length</span></div>
             <div class="method-item"><span class="method-label">Latency</span><span class="method-val">Wall clock time of the API call</span></div>
@@ -203,6 +203,17 @@ function buildOverview(loadedModels) {
             score = 0.45 × correct + 0.35 × valid_ratio + 0.10 × (1 − norm_latency) + 0.10 × format_followed
           </div>
           <p style="margin-top:10px;font-size:12px;color:var(--text-muted)">Correctness is the dominant signal. Valid ratio gives partial credit for legal but incorrect sequences. Latency is normalized against a 30s cap. Format compliance rewards models that follow output instructions.</p>
+        </div>
+
+        <div class="method-section">
+          <h3>How the verifier evolved</h3>
+          <p>The accuracy number is only as trustworthy as the checker behind it. Getting that checker right took three passes — including catching an over-correction of our own.</p>
+          <div class="method-grid">
+            <div class="method-item"><span class="method-label">Act 1 · Exact match</span><span class="method-val">v1 compared the model's full move sequence directly to Lichess's recorded solution. Simple, but it rejects any valid answer that is not byte-for-byte the canonical line.</span></div>
+            <div class="method-item"><span class="method-label">Act 2 · Any legal mate (over-correction)</span><span class="method-val">We suspected models were finding <em>other</em> valid mates that exact-match threw away, so we accepted any line whose every move was legal and whose final position was checkmate. This <strong>inflated</strong> results — o3 jumped ~71% → ~86% — but it was an artifact: the check lets the model play <em>both sides</em>, reaching mate only because the opponent made cooperative, suboptimal replies a real defender never would. That is not a forced mate.</span></div>
+            <div class="method-item"><span class="method-label">Act 3 · Forced line, free final move</span><span class="method-val">Lichess builds puzzles so the intermediate moves are the single <strong>forcing</strong> line (the defender's best replies are baked in), and only the <strong>final mating move</strong> may vary, since a mating position can have several legal mates. So the correct check: match Lichess's line on every move <em>except the last</em>, then accept any legal mate at the final ply. This moved o3 71.3% → 76% — a smaller, honest correction.</span></div>
+          </div>
+          <p style="margin-top:10px">Act 3 is correct and not arbitrary: matching the intermediate moves guarantees the sequence was genuinely forcing, because those moves already encode the opponent's best defense — Lichess's line <em>is</em> the best-defense line. The final move is the only free variable because the mating position can admit multiple legal mates. That is why no full engine search at every ply is needed.</p>
         </div>
 
         <div class="method-section">
