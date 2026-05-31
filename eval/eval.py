@@ -59,6 +59,51 @@ def validate_moves(fen: str, predicted_moves: str) -> dict:
     }
 
 
+def is_alternative_mate(fen: str, predicted_moves: str, correct_moves: str) -> bool:
+    """
+    True if the model gave a valid ALTERNATIVE mate: it follows the Lichess
+    solution exactly except for the final move, and that different final move is
+    still a legal checkmate.
+
+    This mirrors Lichess's own puzzle rule. Lichess generates puzzles so that the
+    solver's move is unique (the only winning move) at every step EXCEPT the last:
+    if several moves all deliver mate, any of them is accepted. So we credit a
+    line only when:
+      - it has the same length as the canonical solution,
+      - every move except the last matches the canonical solution exactly
+        (the forced line is reproduced — this is what guarantees soundness),
+      - the final move DIFFERS from the canonical final move, and
+      - applying the full line is legal and reaches checkmate.
+
+    A line whose intermediate moves diverge from the solution is NOT credited,
+    even if it happens to end in mate, because Lichess does not consider such a
+    line a valid solution (it would only work against a cooperating defender).
+    """
+    pred = (predicted_moves or "").strip().split()
+    sol  = (correct_moves or "").strip().split()
+    if not sol or len(pred) != len(sol):
+        return False
+    # All but the final move must match the canonical (forced) solution.
+    if pred[:-1] != sol[:-1]:
+        return False
+    # The final move must actually differ (otherwise it is an exact match).
+    if pred[-1] == sol[-1]:
+        return False
+    try:
+        board = chess.Board(fen)
+    except Exception:
+        return False
+    for move_uci in pred:
+        try:
+            move = chess.Move.from_uci(move_uci)
+        except Exception:
+            return False
+        if move not in board.legal_moves:
+            return False
+        board.push(move)
+    return board.is_checkmate()
+
+
 # ── Per-puzzle scoring ────────────────────────────────────────────────────────
 
 def score_puzzle(puzzle: dict) -> dict:
@@ -79,8 +124,15 @@ def score_puzzle(puzzle: dict) -> dict:
     valid_count    = validity["valid_moves_count"]
     valid_ratio    = round(valid_count / total_moves, 4) if total_moves > 0 else 0.0
 
-    # correctness — exact match
-    is_correct     = int(predicted.strip().split() == correct.strip().split())
+    # correctness — exact match against the Lichess solution line
+    exact_match    = int(predicted.strip().split() == correct.strip().split())
+
+    # alternative mate — the model reproduced the forced solution but finished
+    # with a different (still legal) mating move. Lichess accepts any mate on the
+    # final move, so this counts as solved. A puzzle is correct if the model
+    # matched Lichess exactly OR delivered such an alternative final mate.
+    alt_mate       = int(is_alternative_mate(fen, predicted, correct))
+    is_correct     = int(bool(exact_match) or bool(alt_mate))
 
     # output format followed — did the model return the expected number of UCI moves?
     predicted_count        = len(predicted.strip().split()) if predicted.strip() else 0
@@ -105,6 +157,8 @@ def score_puzzle(puzzle: dict) -> dict:
         "total_moves":            total_moves,
         "valid_ratio":            valid_ratio,
         "correct":                is_correct,
+        "exact_match":            exact_match,
+        "alt_mate":               alt_mate,
         "output_format_followed": output_format_followed,
         "score":                  score,
     }
@@ -144,6 +198,8 @@ def aggregate(scored_puzzles: list) -> dict:
     return {
         "total_puzzles":          n,
         "overall_accuracy":       avg("correct"),
+        "exact_match_rate":       avg("exact_match"),
+        "alt_mate_count":         sum(p.get("alt_mate", 0) for p in scored_puzzles),
         "avg_score":              avg("score"),
         "avg_valid_ratio":        avg("valid_ratio"),
         "format_compliance_rate": avg("output_format_followed"),
