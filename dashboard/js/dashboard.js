@@ -11,49 +11,57 @@ const MODEL_META = {
     label: 'Claude Haiku 4.5', provider: 'claude', tier: 'Fast / Cheap',
     analysis: `
       <div class="method-section"><h3>Profile</h3>
-      <p>Same accuracy as GPT-4.1 Mini (1.7%) but ~8× slower and far less disciplined: only <strong>45% format compliance</strong> despite burning ~900 output tokens per puzzle. Solves a few mate-in-1s and essentially nothing longer.</p></div>
+      <p>Regular mode: <strong>1.7% accuracy</strong>, ~45% format compliance, ~900 output tokens at ~8s per puzzle. It solves a handful of mate-in-1s and essentially nothing longer. Composite 0.18, the bottom of the field.</p></div>
       <div class="method-section"><h3>What stands out</h3>
-      <p>It reasons at length but rarely converges, and it frequently drifts out of clean UCI into algebraic notation, prose, or the wrong number of moves, so even when the idea is reasonable, the answer is unusable. The weakest cost/benefit in the field: verbose without payoff.</p></div>`,
+      <p>It reasons at length but rarely converges, and it frequently drifts out of clean UCI into algebraic notation or prose, so even a sound idea becomes unusable. Extended thinking makes it <em>worse</em>: format compliance collapses to ~11% and accuracy dips to 1.3% while tokens balloon ~6&times;. The weakest cost/benefit in the field.</p></div>`,
   },
   'claude-sonnet-4-6': {
     label: 'Claude Sonnet 4.6', provider: 'claude', tier: 'Mid',
     analysis: `
       <div class="method-section"><h3>Profile</h3>
-      <p>Ties GPT-4.1 on accuracy (6%) with the highest format compliance of any model except o3 (<strong>91%</strong>). Slow (~24s) and verbose (~1,180 output tokens).</p></div>
+      <p>Regular mode: <strong>6.3% accuracy</strong> (6.0% exact + 1 alternate mate) with very high format discipline (<strong>91%</strong>) and ~43% legal-move rate. Slow (~24s) and verbose (~1,180 output tokens). Composite 0.29.</p></div>
       <div class="method-section"><h3>What stands out</h3>
-      <p>The most <strong>disciplined output</strong> among the non-reasoning models: when it answers, it's clean UCI of the right length. But the extra deliberation buys format reliability, not more solutions. It lands the same accuracy as GPT-4.1 at ~30× the latency.</p></div>`,
+      <p>Among the most <strong>disciplined non-reasoning outputs</strong>: when it answers, it is clean UCI of the right length. But deliberation buys format reliability, not more solutions, and turning on extended thinking backfires hard &mdash; format compliance falls to ~6% and accuracy to 0.7%.</p></div>`,
   },
   'claude-opus-4-7': {
     label: 'Claude Opus 4.7', provider: 'claude', tier: 'Flagship',
     analysis: `
       <div class="method-section"><h3>Profile</h3>
-      <p>Highest accuracy of the five non-reasoning models (<strong>8.3%</strong>), yet the <strong>lowest format compliance (36%)</strong> and the highest token use (~1,775), which drags its composite score (0.19) to near the bottom.</p></div>
+      <p>Regular mode: <strong>9.0% accuracy</strong> (8.3% exact + 2 alternate mates), the second-best non-reasoning model. But the <strong>lowest format compliance (36%)</strong> and high token use (~1,775) hold its composite to 0.21, near the bottom.</p></div>
       <div class="method-section"><h3>What stands out</h3>
-      <p>The clearest case of <strong>capability undercut by output</strong>. It finds more mates than any other non-reasoning model, but routinely spills repeated or loose moves instead of a single clean line, so the eval can't credit work it actually did. A sharp illustration that raw ability does not equal usable output.</p></div>`,
+      <p>The clearest case of <strong>capability undercut by output</strong>: it finds real mates but routinely spills repeated or loose moves instead of one clean line, so the eval cannot credit work it actually did. Reasoning mode is catastrophic here &mdash; ~1% format compliance and 1% accuracy.</p></div>`,
+  },
+  'claude-opus-4-8': {
+    label: 'Claude Opus 4.8', provider: 'claude', tier: 'Flagship',
+    analysis: `
+      <div class="method-section"><h3>Profile</h3>
+      <p>The strongest non-reasoning model in the field: <strong>10.7% accuracy</strong> with the highest format compliance of any non-reasoning model (<strong>93%</strong>) and the highest legal-move rate (<strong>58%</strong>), at a reasonable ~14s and only ~850 output tokens. Top composite among non-reasoning models at <strong>0.40</strong>.</p></div>
+      <div class="method-section"><h3>What stands out</h3>
+      <p>It fixes Opus 4.7's central flaw: nearly the same raw ability, but it returns one clean line instead of spilling moves, so the eval credits what it finds. The lesson is sharp &mdash; <strong>output discipline, not just search, is what turns capability into score</strong>. Extended thinking still hurts (format compliance drops to ~7%, accuracy to 4.3%), so its best results come from the direct, non-reasoning path.</p></div>`,
   },
   'gpt-4.1-mini': {
     label: 'GPT-4.1 Mini', provider: 'openai', tier: 'Fast / Cheap',
     analysis: `
       <div class="method-section"><h3>Profile</h3>
-      <p>The cheapest, fastest model (~1s, ~95 output tokens). Solves only the simplest puzzles (~8% of mate-in-1s, essentially 0% beyond) with solid format compliance (84%).</p></div>
+      <p>The cheapest, fastest entrant (~1.4s, ~95 output tokens). <strong>1.7% accuracy</strong> with solid format compliance (84%); it solves only the simplest mate-in-1s and essentially nothing beyond. Composite 0.27, propped up entirely by speed.</p></div>
       <div class="method-section"><h3>What stands out</h3>
-      <p>The capability <strong>floor</strong>: fast and well-behaved, but no real multi-move search. It can occasionally pattern-match a one-move mate; anything requiring lookahead collapses.</p></div>`,
+      <p>The capability <strong>floor</strong>: fast and well-behaved, but no real multi-move search. It can pattern-match a one-move mate; anything requiring lookahead collapses.</p></div>`,
   },
   'gpt-4.1': {
     label: 'GPT-4.1', provider: 'openai', tier: 'Mid',
     analysis: `
       <div class="method-section"><h3>Profile</h3>
-      <p>Best of the non-reasoning models on composite score (0.36), driven by speed and format discipline: sub-second responses, just ~25 output tokens, 87% format compliance. 25% on mate-in-1, tapering to ~0 by mate-in-3.</p></div>
+      <p><strong>6.7% accuracy</strong> (6.3% exact + 1 alternate mate) with sub-second responses, ~25 output tokens, and 87% format compliance. Composite <strong>0.36</strong> &mdash; second only to Opus 4.8 among non-reasoning models, on the strength of speed and discipline.</p></div>
       <div class="method-section"><h3>What stands out</h3>
-      <p>The most <strong>efficient</strong> model in the field: terse, fast, clean. But efficiency is the whole story. It answers quickly and correctly formats, it just can't search deep. Excellent cost/latency, hard capability ceiling.</p></div>`,
+      <p>The most <strong>efficient</strong> model in the field: terse, fast, clean. But efficiency is the whole story &mdash; it formats correctly and answers instantly, it just cannot search deep. Excellent cost/latency, hard capability ceiling.</p></div>`,
   },
   'o3': {
     label: 'o3', provider: 'openai', tier: 'Reasoning',
     analysis: `
       <div class="method-section"><h3>Profile</h3>
-      <p>A different class entirely: <strong>71% accuracy</strong> vs. single digits for every other model, with 92% format compliance. It degrades <em>gracefully</em> along difficulty (mate-in-1 95% down to mate-in-5 50%; beginner 83% down to expert 56%) where the others flatline near 0%. The cost is latency (~104s per puzzle) and price.</p></div>
+      <p>A different class entirely: <strong>76% accuracy</strong> (71.3% exact + 14 alternate mates) versus single digits for every other model, with 92% format compliance and a 92% legal-move rate. It degrades <em>gracefully</em> with difficulty where the others flatline near zero. The cost is latency (~104s per puzzle) and price (~16k output tokens).</p></div>
       <div class="method-section"><h3>What stands out: it knows when it's stuck</h3>
-      <p>o3 has a failure mode the others don't: when it genuinely can't find a forced mate, it <strong>says so</strong> ("I'm sorry, I can't solve this") instead of inventing a plausible-looking wrong line. Its misses are mostly explicit refusals or last-move near-misses, not confident hallucinations. That calibration is a real qualitative edge the accuracy number alone doesn't capture: a more honest, safer behavior.</p></div>`,
+      <p>o3 has a failure mode the others lack: when it genuinely cannot find a forced mate, it <strong>says so</strong> ("I can't solve this") instead of inventing a plausible-looking wrong line. Its misses are mostly explicit refusals or last-move near-misses, not confident hallucinations &mdash; a real calibration edge the accuracy number alone does not capture.</p></div>`,
   },
 };
 
