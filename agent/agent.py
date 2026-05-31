@@ -73,14 +73,24 @@ def extract_uci_moves(text: str) -> str:
 
 # ── Claude agent ──────────────────────────────────────────────────────────────
 
+# Extended thinking budget for Claude. o3 was observed using ~16k reasoning
+# tokens per puzzle, so we give Claude a generous, comparable budget so neither
+# side is handicapped. max_tokens must exceed the thinking budget (it covers
+# thinking + the final answer).
+CLAUDE_THINKING_BUDGET = 32000
+CLAUDE_MAX_TOKENS      = CLAUDE_THINKING_BUDGET + 8000
+
 def query_claude(client: anthropic.Anthropic, model: str, fen: str, mate_type: str) -> dict:
     import random
     for attempt in range(5):
         try:
             start = time.time()
-            response = client.messages.create(
+            # Stream: extended thinking with a high token budget can exceed the
+            # non-streaming request limit, so we stream and assemble the final message.
+            with client.messages.stream(
                 model=model,
-                max_tokens=2048,
+                max_tokens=CLAUDE_MAX_TOKENS,
+                thinking={"type": "enabled", "budget_tokens": CLAUDE_THINKING_BUDGET},
                 system=[
                     {
                         "type": "text",
@@ -91,7 +101,8 @@ def query_claude(client: anthropic.Anthropic, model: str, fen: str, mate_type: s
                 messages=[
                     {"role": "user", "content": build_user_prompt(fen, mate_type)},
                 ],
-            )
+            ) as stream:
+                response = stream.get_final_message()
             latency_ms = int((time.time() - start) * 1000)
             break
         except Exception as e:
@@ -102,7 +113,13 @@ def query_claude(client: anthropic.Anthropic, model: str, fen: str, mate_type: s
                 time.sleep(wait)
             else:
                 raise
-    raw = response.content[0].text
+
+    # With extended thinking, content holds thinking block(s) then the text block.
+    # Grab the last text block (ignore thinking / redacted_thinking blocks).
+    raw = ""
+    for block in response.content:
+        if getattr(block, "type", None) == "text":
+            raw = block.text
     return {
         "predicted_moves": extract_uci_moves(raw),
         "latency_ms":      latency_ms,
@@ -179,9 +196,10 @@ def run_agent(puzzles: list, model: str) -> list:
     is_claude = model in ANTHROPIC_MODELS
 
     if is_claude:
-        client = anthropic.Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"])
+        # Longer timeout: extended thinking can make individual calls slow.
+        client = anthropic.Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"], timeout=900.0)
     else:
-        client = OpenAI(api_key=os.environ["OPENAI_API_KEY"])
+        client = OpenAI(api_key=os.environ["OPENAI_API_KEY"], timeout=900.0)
 
     results = []
 
