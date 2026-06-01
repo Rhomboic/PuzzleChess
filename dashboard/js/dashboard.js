@@ -207,6 +207,11 @@ function switchTab(tabKey) {
 
 function totalRunTime(data) {
   const ms = data.puzzles.reduce((sum, p) => sum + p.latency_ms, 0);
+  // Reasoning runs are long (many puzzles take minutes each), so show the total
+  // in decimal hours under the Reasoning toggle for an at-a-glance comparison.
+  if (currentMode === 'reasoning') {
+    return `${(ms / 3600000).toFixed(1)}h`;
+  }
   const h  = Math.floor(ms / 3600000);
   const m  = Math.floor((ms % 3600000) / 60000);
   const s  = Math.floor((ms % 60000) / 1000);
