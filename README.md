@@ -1,4 +1,4 @@
-# PuzzleChess
+# PuzzleChess Benchmark
 
 An LLM agent benchmark that evaluates how well AI models solve chess puzzles. Runs as an ephemeral Docker container on AWS ECS Fargate.
 
