@@ -6,62 +6,103 @@ const S3_BASE  = IS_LOCAL
   : 'https://puzzlechess-results-673981388599.s3.us-west-1.amazonaws.com/runs/';
 
 // Known models: label/provider/tier + a qualitative analysis write-up per model.
+// `analysis` is keyed by run mode (`regular` / `reasoning`) so each toggle shows
+// a write-up about the run it is actually displaying.
 const MODEL_META = {
   'claude-haiku-4-5': {
     label: 'Claude Haiku 4.5', provider: 'claude', tier: 'Fast / Cheap',
-    analysis: `
-      <div class="method-section"><h3>Profile</h3>
-      <p>Regular mode: <strong>1.7% accuracy</strong>, ~45% format compliance, ~900 output tokens at ~8s per puzzle. It solves a handful of mate-in-1s and essentially nothing longer. Composite 0.18, the bottom of the field.</p></div>
+    analysis: {
+      regular: `
+      <div class="method-section"><h3>Profile (regular)</h3>
+      <p><strong>1.7% accuracy</strong>, ~45% format compliance, ~900 output tokens at ~8s per puzzle. It solves a handful of mate-in-1s and essentially nothing longer. Composite 0.18, the bottom of the field.</p></div>
       <div class="method-section"><h3>What stands out</h3>
-      <p>It reasons at length but rarely converges, and it frequently drifts out of clean UCI into algebraic notation or prose, so even a sound idea becomes unusable. Extended thinking makes it <em>worse</em>: format compliance collapses to ~11% and accuracy dips to 1.3% while tokens balloon ~6&times;. The weakest cost/benefit in the field.</p></div>`,
+      <p>It reasons at length but rarely converges, and it frequently drifts out of clean UCI into algebraic notation or prose, so even a sound idea becomes unusable. The weakest cost/benefit in the field.</p></div>`,
+      reasoning: `
+      <div class="method-section"><h3>Profile (extended thinking)</h3>
+      <p>Turning on extended thinking makes it <em>worse</em>: <strong>1.3% accuracy</strong>, format compliance collapses to ~11%, tokens balloon roughly 6x (~5,600), and latency rises to ~40s. Only 37 of 300 puzzles produce any answer at all.</p></div>
+      <div class="method-section"><h3>What stands out</h3>
+      <p>The extra thinking burns budget without producing a clean final line. Of the few puzzles it does finish, ~11% are correct, but the timeout and empty rate is so high that the run is worse than the direct one on every aggregate metric.</p></div>`,
+    },
   },
   'claude-sonnet-4-6': {
     label: 'Claude Sonnet 4.6', provider: 'claude', tier: 'Mid',
-    analysis: `
-      <div class="method-section"><h3>Profile</h3>
-      <p>Regular mode: <strong>6.3% accuracy</strong> (6.0% exact + 1 alternate mate) with very high format discipline (<strong>91%</strong>) and ~43% legal-move rate. Slow (~24s) and verbose (~1,180 output tokens). Composite 0.29.</p></div>
+    analysis: {
+      regular: `
+      <div class="method-section"><h3>Profile (regular)</h3>
+      <p><strong>6.3% accuracy</strong> (6.0% exact + 1 alternate mate) with very high format discipline (<strong>91%</strong>) and ~43% legal-move rate. Slow (~24s) and verbose (~1,180 output tokens). Composite 0.29.</p></div>
       <div class="method-section"><h3>What stands out</h3>
-      <p>Among the most <strong>disciplined non-reasoning outputs</strong>: when it answers, it is clean UCI of the right length. But deliberation buys format reliability, not more solutions, and turning on extended thinking backfires hard &mdash; format compliance falls to ~6% and accuracy to 0.7%.</p></div>`,
+      <p>Among the most <strong>disciplined non-reasoning outputs</strong>: when it answers, it is clean UCI of the right length. But the deliberation buys format reliability, not more solutions.</p></div>`,
+      reasoning: `
+      <div class="method-section"><h3>Profile (extended thinking)</h3>
+      <p>Extended thinking backfires hard: <strong>0.7% accuracy</strong>, format compliance falls to ~6%, legal-move rate to ~3%, with only 20 of 300 puzzles producing any answer. Composite 0.02.</p></div>
+      <div class="method-section"><h3>What stands out</h3>
+      <p>The opposite of its regular run. The disciplined, right-length output disappears once it is allowed to think freely: it talks itself past the budget and rarely emits a usable final line.</p></div>`,
+    },
   },
   'claude-opus-4-7': {
     label: 'Claude Opus 4.7', provider: 'claude', tier: 'Flagship',
-    analysis: `
-      <div class="method-section"><h3>Profile</h3>
-      <p>Regular mode: <strong>9.0% accuracy</strong> (8.3% exact + 2 alternate mates), the second-best non-reasoning model. But the <strong>lowest format compliance (36%)</strong> and high token use (~1,775) hold its composite to 0.21, near the bottom.</p></div>
+    analysis: {
+      regular: `
+      <div class="method-section"><h3>Profile (regular)</h3>
+      <p><strong>9.0% accuracy</strong> (8.3% exact + 2 alternate mates), the second-best non-reasoning model. But the <strong>lowest format compliance (36%)</strong> and high token use (~1,775) hold its composite to 0.20, near the bottom.</p></div>
       <div class="method-section"><h3>What stands out</h3>
-      <p>The clearest case of <strong>capability undercut by output</strong>: it finds real mates but routinely spills repeated or loose moves instead of one clean line, so the eval cannot credit work it actually did. Reasoning mode is catastrophic here &mdash; ~1% format compliance and 1% accuracy.</p></div>`,
+      <p>The clearest case of <strong>capability undercut by output</strong>: it finds real mates but routinely spills repeated or loose moves instead of one clean line, so the eval cannot credit work it actually did.</p></div>`,
+      reasoning: `
+      <div class="method-section"><h3>Profile (extended thinking)</h3>
+      <p>Reasoning mode is catastrophic here: <strong>1.0% accuracy</strong>, ~1% format compliance, and only 5 of 300 puzzles produce any answer before timing out. Composite 0.01.</p></div>
+      <div class="method-section"><h3>What stands out</h3>
+      <p>The output-discipline problem from its regular run becomes total once thinking is unbounded. With almost nothing reaching a final answer, the run is effectively unscored.</p></div>`,
+    },
   },
   'claude-opus-4-8': {
     label: 'Claude Opus 4.8', provider: 'claude', tier: 'Flagship',
-    analysis: `
-      <div class="method-section"><h3>Profile</h3>
-      <p>The strongest non-reasoning model in the field: <strong>10.7% accuracy</strong> with the highest format compliance of any non-reasoning model (<strong>93%</strong>) and the highest legal-move rate (<strong>58%</strong>), at a reasonable ~14s and only ~850 output tokens. Top composite among non-reasoning models at <strong>0.40</strong>.</p></div>
+    analysis: {
+      regular: `
+      <div class="method-section"><h3>Profile (regular)</h3>
+      <p>The strongest non-reasoning model in the field: <strong>10.7% accuracy</strong> with the highest format compliance of any non-reasoning model (<strong>93%</strong>) and the highest legal-move rate (<strong>58%</strong>), at ~14s and only ~850 output tokens. Top non-reasoning composite at <strong>0.40</strong>.</p></div>
       <div class="method-section"><h3>What stands out</h3>
-      <p>It fixes Opus 4.7's central flaw: nearly the same raw ability, but it returns one clean line instead of spilling moves, so the eval credits what it finds. The lesson is sharp &mdash; <strong>output discipline, not just search, is what turns capability into score</strong>. And unlike the other Claude models, <strong>extended thinking transforms it</strong>: with reasoning on it jumps to <strong>54% accuracy</strong> (51% exact), composite 0.57 &mdash; a 5&times; gain that vaults it past every non-reasoning model and into o3's neighbourhood. The catch is cost and discipline: ~5.7 min per puzzle, ~24k output tokens, format compliance easing to 72%, and 83 of 300 puzzles timing out before it finishes thinking. On the puzzles it does answer, it solves <strong>75%</strong>.</p></div>`,
+      <p>It fixes Opus 4.7's central flaw: nearly the same raw ability, but it returns one clean line instead of spilling moves, so the eval credits what it finds. <strong>Output discipline, not just search, is what turns capability into score.</strong> Its much stronger reasoning run is one toggle away.</p></div>`,
+      reasoning: `
+      <div class="method-section"><h3>Profile (extended thinking)</h3>
+      <p>The one Claude model extended thinking transforms: <strong>54% accuracy</strong> (51% exact + 9 alternate mates), composite <strong>0.57</strong>, a roughly 5x jump over its 10.7% regular run that lifts it past every non-reasoning model and into o3's neighbourhood. The price is steep: ~5.7 min per puzzle, ~24k output tokens, format compliance easing to 72%.</p></div>
+      <div class="method-section"><h3>What stands out: timeouts, not wrong answers</h3>
+      <p>83 of 300 puzzles time out before it finishes thinking and return empty. On the 217 it does answer, it solves <strong>75%</strong>, so most of the remaining gap to o3 is unfinished thinking rather than bad moves. Given more time per puzzle, the headline number would likely climb.</p></div>`,
+    },
   },
   'gpt-4.1-mini': {
     label: 'GPT-4.1 Mini', provider: 'openai', tier: 'Fast / Cheap',
-    analysis: `
-      <div class="method-section"><h3>Profile</h3>
+    analysis: {
+      regular: `
+      <div class="method-section"><h3>Profile (regular)</h3>
       <p>The cheapest, fastest entrant (~1.4s, ~95 output tokens). <strong>1.7% accuracy</strong> with solid format compliance (84%); it solves only the simplest mate-in-1s and essentially nothing beyond. Composite 0.27, propped up entirely by speed.</p></div>
       <div class="method-section"><h3>What stands out</h3>
-      <p>The capability <strong>floor</strong>: fast and well-behaved, but no real multi-move search. It can pattern-match a one-move mate; anything requiring lookahead collapses.</p></div>`,
+      <p>The capability <strong>floor</strong>: fast and well-behaved, but no real multi-move search. It can pattern-match a one-move mate; anything requiring lookahead collapses. Not a reasoning model, so there is no extended-thinking run.</p></div>`,
+    },
   },
   'gpt-4.1': {
     label: 'GPT-4.1', provider: 'openai', tier: 'Mid',
-    analysis: `
-      <div class="method-section"><h3>Profile</h3>
-      <p><strong>6.7% accuracy</strong> (6.3% exact + 1 alternate mate) with sub-second responses, ~25 output tokens, and 87% format compliance. Composite <strong>0.36</strong> &mdash; second only to Opus 4.8 among non-reasoning models, on the strength of speed and discipline.</p></div>
+    analysis: {
+      regular: `
+      <div class="method-section"><h3>Profile (regular)</h3>
+      <p><strong>6.7% accuracy</strong> (6.3% exact + 1 alternate mate) with sub-second responses, ~25 output tokens, and 87% format compliance. Composite <strong>0.36</strong>, second only to Opus 4.8 among non-reasoning models, on the strength of speed and discipline.</p></div>
       <div class="method-section"><h3>What stands out</h3>
-      <p>The most <strong>efficient</strong> model in the field: terse, fast, clean. But efficiency is the whole story &mdash; it formats correctly and answers instantly, it just cannot search deep. Excellent cost/latency, hard capability ceiling.</p></div>`,
+      <p>The most <strong>efficient</strong> model in the field: terse, fast, clean. But efficiency is the whole story. It formats correctly and answers instantly, it just cannot search deep. Excellent cost/latency, hard capability ceiling. Not a reasoning model, so there is no extended-thinking run.</p></div>`,
+    },
   },
   'o3': {
     label: 'o3', provider: 'openai', tier: 'Reasoning',
-    analysis: `
-      <div class="method-section"><h3>Profile</h3>
-      <p>A different class entirely: <strong>76% accuracy</strong> (71.3% exact + 14 alternate mates) versus single digits for every other model, with 92% format compliance and a 92% legal-move rate. It degrades <em>gracefully</em> where the others flatline near zero: by mate length, 97% on mate-in-1 down to 53% on mate-in-5; by difficulty, 87% on beginner puzzles down to 59% on expert. The cost is latency (~104s per puzzle) and price (~16k output tokens).</p></div>
+    analysis: {
+      reasoning: `
+      <div class="method-section"><h3>Profile (reasoning, default)</h3>
+      <p>A different class entirely: <strong>76.7% accuracy</strong> (71.3% exact + 16 alternate mates) versus single digits for every other model, with 87% format compliance and an 87% legal-move rate, at ~145s per puzzle and ~21k output tokens. o3 reasons by default, so this is its native mode.</p></div>
       <div class="method-section"><h3>What stands out: it knows when it's stuck</h3>
-      <p>o3 has a failure mode the others lack: when it genuinely cannot find a forced mate, it <strong>says so</strong> ("I can't solve this") instead of inventing a plausible-looking wrong line. Its misses are mostly explicit refusals or last-move near-misses, not confident hallucinations &mdash; a real calibration edge the accuracy number alone does not capture.</p></div>`,
+      <p>o3 has a failure mode the others lack: when it genuinely cannot find a forced mate, it <strong>says so</strong> ("I can't solve this") instead of inventing a plausible-looking wrong line. Its misses are mostly explicit refusals or last-move near-misses, not confident hallucinations, a real calibration edge the accuracy number alone does not capture.</p></div>`,
+      regular: `
+      <div class="method-section"><h3>Profile (default decoding)</h3>
+      <p><strong>76.0% accuracy</strong> (71.3% exact + 14 alternate mates), 92% format compliance, 92% legal-move rate, ~104s per puzzle, ~16k output tokens. It degrades gracefully where the others flatline near zero: by mate length, 97% on mate-in-1 down to 53% on mate-in-5; by difficulty, 87% on beginner puzzles down to 59% on expert.</p></div>
+      <div class="method-section"><h3>What stands out</h3>
+      <p>o3 is an inherent reasoning model, so its two runs land within a point of each other (76.0% vs 76.7%): there is no "no-thinking" o3 to compare against. The takeaway is the same either way, a model doing genuine lookahead, with the honest "I can't solve this" refusal behaviour described under its reasoning run.</p></div>`,
+    },
   },
 };
 
@@ -166,6 +207,11 @@ function switchTab(tabKey) {
 
 function totalRunTime(data) {
   const ms = data.puzzles.reduce((sum, p) => sum + p.latency_ms, 0);
+  // Reasoning runs are long (many puzzles take minutes each), so show the total
+  // in decimal hours under the Reasoning toggle for an at-a-glance comparison.
+  if (currentMode === 'reasoning') {
+    return `${(ms / 3600000).toFixed(1)}h`;
+  }
   const h  = Math.floor(ms / 3600000);
   const m  = Math.floor((ms % 3600000) / 60000);
   const s  = Math.floor((ms % 60000) / 1000);
@@ -220,13 +266,13 @@ function buildOverview(loadedModels) {
 
         <div class="method-section">
           <h3>How the verifier evolved</h3>
-          <p>The accuracy number is only as trustworthy as the checker behind it. Getting that checker right took three passes — including catching an over-correction of our own.</p>
+          <p>The accuracy number is only as trustworthy as the checker behind it. Getting that checker right took three passes, including catching an over-correction of our own.</p>
           <div class="method-grid">
             <div class="method-item"><span class="method-label">Act 1 · Exact match</span><span class="method-val">v1 compared the model's full move sequence directly to Lichess's recorded solution. Simple, but it rejects any valid answer that is not byte-for-byte the canonical line.</span></div>
-            <div class="method-item"><span class="method-label">Act 2 · Any legal mate (over-correction)</span><span class="method-val">We suspected models were finding <em>other</em> valid mates that exact-match threw away, so we accepted any line whose every move was legal and whose final position was checkmate. This <strong>inflated</strong> results — o3 jumped ~71% → ~86% — but it was an artifact: the check lets the model play <em>both sides</em>, reaching mate only because the opponent made cooperative, suboptimal replies a real defender never would. That is not a forced mate.</span></div>
-            <div class="method-item"><span class="method-label">Act 3 · Forced line, free final move</span><span class="method-val">Lichess builds puzzles so the intermediate moves are the single <strong>forcing</strong> line (the defender's best replies are baked in), and only the <strong>final mating move</strong> may vary, since a mating position can have several legal mates. So the correct check: match Lichess's line on every move <em>except the last</em>, then accept any legal mate at the final ply. This moved o3 71.3% → 76% — a smaller, honest correction.</span></div>
+            <div class="method-item"><span class="method-label">Act 2 · Any legal mate (over-correction)</span><span class="method-val">We suspected models were finding <em>other</em> valid mates that exact-match threw away, so we accepted any line whose every move was legal and whose final position was checkmate. This <strong>inflated</strong> results (o3 jumped ~71% to ~86%) but it was an artifact: the check lets the model play <em>both sides</em>, reaching mate only because the opponent made cooperative, suboptimal replies a real defender never would. That is not a forced mate.</span></div>
+            <div class="method-item"><span class="method-label">Act 3 · Forced line, free final move</span><span class="method-val">Lichess builds puzzles so the intermediate moves are the single <strong>forcing</strong> line (the defender's best replies are baked in), and only the <strong>final mating move</strong> may vary, since a mating position can have several legal mates. So the correct check: match Lichess's line on every move <em>except the last</em>, then accept any legal mate at the final ply. This moved o3 from 71.3% to 76%, a smaller and honest correction.</span></div>
           </div>
-          <p style="margin-top:10px">Act 3 is correct and not arbitrary: matching the intermediate moves guarantees the sequence was genuinely forcing, because those moves already encode the opponent's best defense — Lichess's line <em>is</em> the best-defense line. The final move is the only free variable because the mating position can admit multiple legal mates. That is why no full engine search at every ply is needed.</p>
+          <p style="margin-top:10px">Act 3 is correct and not arbitrary: matching the intermediate moves guarantees the sequence was genuinely forcing, because those moves already encode the opponent's best defense. Lichess's line <em>is</em> the best-defense line. The final move is the only free variable because the mating position can admit multiple legal mates. That is why no full engine search at every ply is needed.</p>
         </div>
 
         <div class="method-section">
@@ -259,13 +305,13 @@ function buildOverview(loadedModels) {
       <div class="card"><div class="card-title">Valid Move Rate</div><div class="card-desc">% of predicted moves that are actually legal in the position (checked with python-chess)</div><div class="chart-wrap"><canvas id="chart-valid"></canvas></div></div>
     </div>
     <div class="grid-2 section">
-      <div class="card"><div class="card-title">Latency vs Accuracy</div><div class="card-desc">Speed vs correctness tradeoff — closer to top-left is better</div><div class="chart-wrap"><canvas id="chart-scatter"></canvas></div></div>
+      <div class="card"><div class="card-title">Latency vs Accuracy</div><div class="card-desc">Speed vs correctness tradeoff, closer to top-left is better</div><div class="chart-wrap"><canvas id="chart-scatter"></canvas></div></div>
       <div class="card"><div class="card-title">Format Compliance Rate</div><div class="card-desc">% of puzzles where the model followed UCI output format instructions</div><div class="chart-wrap"><canvas id="chart-format"></canvas></div></div>
     </div>
 
     <div class="section card">
       <div class="card-title">Total Benchmark Run Time (300 puzzles)</div>
-      <div class="card-desc">Total wall-clock API time to complete the full benchmark — sum of all 300 puzzle latencies</div>
+      <div class="card-desc">Total wall-clock API time to complete the full benchmark, summed across all 300 puzzle latencies</div>
       <div class="chart-wrap"><canvas id="chart-runtime"></canvas></div>
     </div>
   `;
@@ -404,18 +450,26 @@ function buildModelPanel(key, data) {
       <div class="stat-card"><div class="stat-label">Valid Move Rate</div><div class="stat-value" style="color:${color}">${pct(s.avg_valid_ratio ?? 0)}</div><div class="stat-sub">predicted moves that are legal</div></div>
       <div class="stat-card"><div class="stat-label">Avg Latency</div><div class="stat-value muted">${ms(s.avg_latency_ms)}</div><div class="stat-sub">per puzzle</div></div>
     </div>
-    ${meta.analysis ? `<details class="section card methodology" open>
+    ${(() => {
+      // Pick the analysis written for the run currently being shown; fall back to
+      // the other mode's text if only one was authored.
+      const a = meta.analysis || {};
+      const body = a[currentMode] || a.regular || a.reasoning;
+      if (!body) return '';
+      const modeLabel = currentMode === 'reasoning' ? 'Extended thinking run' : 'Regular run';
+      return `<details class="section card methodology" open>
       <summary>
-        <span class="card-title" style="display:inline;cursor:pointer">Analysis</span>
+        <span class="card-title" style="display:inline;cursor:pointer">Analysis <span class="muted" style="font-weight:500;text-transform:none;letter-spacing:0">· ${modeLabel}</span></span>
         <span class="method-toggle">▸</span>
       </summary>
-      <div class="method-body">${meta.analysis}</div>
-    </details>` : ''}
+      <div class="method-body">${body}</div>
+    </details>`;
+    })()}
     <div class="grid-2 section">
       <div class="card"><div class="card-title">Accuracy by Difficulty Tier</div><div class="card-desc">Does the model degrade on harder puzzles?</div><div class="chart-wrap"><canvas id="chart-${sk}-tier"></canvas></div></div>
       <div class="card"><div class="card-title">Accuracy by Mate Type</div><div class="card-desc">Does sequence length affect performance?</div><div class="chart-wrap"><canvas id="chart-${sk}-mate"></canvas></div></div>
     </div>
-    <div class="section card"><div class="card-title">Score Distribution (300 puzzles)</div><div class="card-desc">Spread of composite scores across all puzzles — right-skewed = more correct answers</div><div class="chart-wrap"><canvas id="chart-${sk}-dist"></canvas></div></div>
+    <div class="section card"><div class="card-title">Score Distribution (300 puzzles)</div><div class="card-desc">Spread of composite scores across all puzzles, right-skewed means more correct answers</div><div class="chart-wrap"><canvas id="chart-${sk}-dist"></canvas></div></div>
   `;
 
   const barOpts = (horizontal) => ({
