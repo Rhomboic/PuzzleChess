@@ -475,6 +475,11 @@ let currentMode = 'reasoning';
 // Render the dashboard for one mode: rebuild tab bar, overview, and panels using
 // only the models that have results in that mode.
 function render(mode) {
+  // Remember the tab the user is currently on so a mode toggle stays put
+  // (e.g. on a model's tab) instead of snapping back to Overview.
+  const activeBtn = document.querySelector('.tab-btn.active');
+  const prevTab = activeBtn ? activeBtn.dataset.tab : 'overview';
+
   currentMode = mode;
   const loaded = LOADED[mode];
   const keys = Object.keys(loaded)
@@ -504,7 +509,11 @@ function render(mode) {
     buildModelPanel(key, loaded[key]);
   });
 
-  switchTab('overview');
+  // Stay on the previously-active tab if it still exists in this mode;
+  // otherwise fall back to Overview (e.g. switching to a mode that lacks
+  // the model whose tab was open).
+  const stillExists = document.querySelector(`.tab-btn[data-tab="${prevTab}"]`);
+  switchTab(stillExists ? prevTab : 'overview');
 }
 
 async function init() {
