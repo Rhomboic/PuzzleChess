@@ -21,7 +21,7 @@ An LLM agent benchmark that evaluates how well AI models solve chess puzzles. Ru
 | gpt-4.1 | OpenAI | Mid |
 | o3 | OpenAI | Reasoning |
 
-Claude models can run with or without **extended thinking** (a reasoning toggle on the dashboard); the numbers below are the non-reasoning runs unless noted.
+Claude models can run with or without **extended thinking** (a reasoning toggle on the dashboard); the numbers below are the non-reasoning runs unless noted. **`claude-opus-4-8` is still being evaluated in reasoning mode** — its reasoning numbers are not final yet, so only its non-reasoning run is reported below.
 
 ## Results
 
@@ -47,7 +47,7 @@ All models, 300 puzzles each, non-reasoning runs, sorted by accuracy. **Accuracy
 
 **Among the non-reasoning models, output discipline beats raw search.** Opus 4.8 leads the pack (10.7%, composite 0.40) not by finding the most mates but by *returning them cleanly* — 93% format compliance and the highest legal-move rate (58%). Its predecessor Opus 4.7 finds nearly as many mates but spills them in loose, repeated moves (36% format compliance), so the eval can't credit work it actually did. Capability and usable output are different axes.
 
-**Extended thinking did not help Claude here — it hurt.** Turning on the reasoning toggle collapsed format compliance for every Claude model (e.g. Sonnet 4.6 dropped from 91% to ~6%): the models think at length, blow past the output budget, and never emit a clean final line. The reasoning runs are kept on the dashboard for honesty, but the headline Claude numbers are the direct, non-reasoning runs.
+**Extended thinking did not help Claude here — it hurt.** Turning on the reasoning toggle collapsed format compliance for every Claude model evaluated so far (e.g. Sonnet 4.6 dropped from 91% to ~6%): the models think at length, blow past the output budget, and never emit a clean final line. The reasoning runs are kept on the dashboard for honesty, but the headline Claude numbers are the direct, non-reasoning runs. (**Opus 4.8's reasoning run is still in progress** — its reasoning result is excluded until that run completes.)
 
 ### How the verifier evolved
 
@@ -62,7 +62,7 @@ The accuracy number is only as trustworthy as the checker behind it, and getting
 ### Per-model analysis
 
 - **o3 (OpenAI, reasoning):** 76% accuracy (71.3% exact + 14 alternate mates), 92% format compliance, but ~104s/puzzle and ~16k output tokens. Genuine search, graceful difficulty curve, and the honest "I can't solve this" failure mode above. A different class of model at a real latency/cost premium.
-- **claude-opus-4-8 (Anthropic, flagship):** the strongest non-reasoning model — 10.7% accuracy, the highest format compliance in the field bar none (93%), the highest legal-move rate (58%), at ~14s and only ~850 output tokens. Composite 0.40, the top non-reasoning score. It fixes Opus 4.7's central flaw: nearly the same raw ability, but it returns one clean line instead of spilling moves.
+- **claude-opus-4-8 (Anthropic, flagship):** the strongest non-reasoning model — 10.7% accuracy, the highest format compliance in the field bar none (93%), the highest legal-move rate (58%), at ~14s and only ~850 output tokens. Composite 0.40, the top non-reasoning score. It fixes Opus 4.7's central flaw: nearly the same raw ability, but it returns one clean line instead of spilling moves. _(Its **reasoning-mode** run is still in progress — those numbers will be added once it completes.)_
 - **claude-opus-4-7 (Anthropic, flagship):** second-best non-reasoning accuracy (9.0% with alternate mates), yet the **lowest** format compliance (36%) and most tokens (~1,775), so its composite (0.20) sinks near the bottom. The clearest case of *capability undercut by output*: it finds mates but spills repeated/loose moves instead of a clean line.
 - **gpt-4.1 (OpenAI, mid):** second-best non-reasoning composite (0.36) via efficiency: sub-second, ~25 output tokens, 87% format compliance. Fast and clean, hard capability ceiling.
 - **claude-sonnet-4-6 (Anthropic, mid):** ~ties gpt-4.1 on accuracy (6.3%) with the highest format compliance short of o3/Opus 4.8 (91%). The most disciplined output among the mid models, but the extra deliberation (~24s) buys format reliability, not more solutions.
