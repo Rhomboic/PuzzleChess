@@ -396,13 +396,19 @@ function buildOverview(loadedModels) {
     b[1].puzzles.reduce((s, p) => s + p.latency_ms, 0)
   );
 
+  // Reasoning runs are long, so show the total in hours under the Reasoning
+  // toggle (matching the table column); minutes under Regular.
+  const rtHours  = currentMode === 'reasoning';
+  const rtDiv    = rtHours ? 3600000 : 60000;
+  const rtUnit   = rtHours ? 'h' : 'm';
+
   new Chart(document.getElementById('chart-runtime'), {
     type: 'bar',
     data: {
       labels: runtimeSorted.map(([k]) => MODEL_META[k]?.label || k),
       datasets: [{
-        label: 'Total Run Time (min)',
-        data: runtimeSorted.map(([,d]) => +(d.puzzles.reduce((s, p) => s + p.latency_ms, 0) / 60000).toFixed(2)),
+        label: `Total Run Time (${rtHours ? 'h' : 'min'})`,
+        data: runtimeSorted.map(([,d]) => +(d.puzzles.reduce((s, p) => s + p.latency_ms, 0) / rtDiv).toFixed(2)),
         backgroundColor: runtimeSorted.map(([k]) => modelColor(k) + '33'),
         borderColor: runtimeSorted.map(([k]) => modelColor(k)),
         borderWidth: 2,
@@ -413,7 +419,7 @@ function buildOverview(loadedModels) {
       responsive: true,
       plugins: { legend: { display: false } },
       scales: {
-        y: { ticks: { callback: v => v + 'm' }, grid: { color: C_BORDER } },
+        y: { ticks: { callback: v => v + rtUnit }, grid: { color: C_BORDER } },
         x: { grid: { display: false } }
       }
     }
